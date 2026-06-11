@@ -568,6 +568,7 @@ function doLogin() {
   const err = document.getElementById('login-error');
   if (ok) {
     currentUser = u;
+    DB.set('session_user', u);
     err.style.display = 'none';
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
@@ -584,10 +585,31 @@ function doLogin() {
 
 function doLogout() {
   currentUser = null;
+  DB.set('session_user', null);
   document.getElementById('app').style.display = 'none';
   document.getElementById('login-screen').style.display = 'flex';
   document.getElementById('login-user').value = '';
   document.getElementById('login-pass').value = '';
+}
+
+function restoreSession() {
+  const storedUser = DB.get('session_user');
+  const users = DB.get('users') || [];
+  if (storedUser && users.find(x => x.user === storedUser)) {
+    currentUser = storedUser;
+    document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    document.getElementById('topbar-user').textContent = '👤 ' + currentUser;
+    loadColors();
+    actualizarNombreNegocio();
+    showSection('inicio');
+    refreshInicio();
+    renderInventario();
+  } else {
+    DB.set('session_user', null);
+    document.getElementById('app').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'flex';
+  }
 }
 
 document.addEventListener('keydown', e => {
@@ -1351,6 +1373,7 @@ window.addEventListener('appinstalled', () => { toast('🎉 App instalada',3000)
 
 // ===== INIT =====
 initDB();
+restoreSession();
 loadColors();
 actualizarNombreNegocio();
 if ('serviceWorker' in navigator) {
