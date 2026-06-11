@@ -1,0 +1,41 @@
+{
+  "name": "VentaFácil — Punto de Venta",
+  "short_name": "T'REX",
+  "description": "Tu punto de venta en el celular",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#1a56db",
+  "theme_color": "#1a56db",
+  "orientation": "portrait-primary",
+  "lang": "es",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "finance", "productivity"],
+  "screenshots": [],
+  "shortcuts": [
+    {
+      "name": "Nueva Venta",
+      "short_name": "Venta",
+      "url": "./index.html#ventas",
+      "description": "Registrar una nueva venta"
+    },
+    {
+      "name": "Inventario",
+      "short_name": "Inventario",
+      "url": "./index.html#inventario",
+      "description": "Ver el inventario"
+    }
+  ]
+}
