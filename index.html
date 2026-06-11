@@ -7,10 +7,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="VentaFácil">
+<meta name="apple-mobile-web-app-title" content="T'REX">
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
-<title>VentaFácil — Punto de Venta</title>
+<title>T'REX — Punto de Venta</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
@@ -163,6 +163,17 @@
   .modal-title { font-size:18px; font-weight:900; margin-bottom:20px; color:var(--text); }
   .modal-close { float:right; background:var(--bg); border:none; font-size:18px; cursor:pointer; color:var(--text2); border-radius:8px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; margin-top:-4px; }
 
+  /* TICKET MODAL */
+  #modal-ticket .modal { border-radius:28px 28px 0 0; }
+  .ticket-body { font-family:'Courier New',monospace; background:#fff; border:2px dashed var(--border); border-radius:12px; padding:20px 16px; margin-bottom:16px; line-height:1.7; font-size:13px; color:#0f172a; }
+  .ticket-body hr { border:none; border-top:1px dashed var(--border); margin:10px 0; }
+  .ticket-header { text-align:center; margin-bottom:8px; }
+  .ticket-header .t-biz { font-size:18px; font-weight:900; letter-spacing:1px; }
+  .ticket-header .t-sub { font-size:11px; color:var(--text2); }
+  .ticket-row { display:flex; justify-content:space-between; }
+  .ticket-row.bold { font-weight:900; font-size:15px; }
+  .ticket-footer { text-align:center; font-size:11px; color:var(--text2); margin-top:8px; }
+
   /* TOAST */
   .toast { position:fixed; bottom:90px; left:50%; transform:translateX(-50%) translateY(16px); background:#0f172a; color:#fff; padding:12px 22px; border-radius:12px; font-size:14px; font-weight:600; z-index:300; opacity:0; transition:opacity .25s,transform .25s; pointer-events:none; white-space:nowrap; box-shadow:0 4px 16px rgba(0,0,0,0.2); }
   .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
@@ -202,6 +213,18 @@
   #install-btn { background:#fff; color:var(--primary); }
   #dismiss-btn { background:rgba(255,255,255,.2); color:#fff; }
 
+  /* BACKUP */
+  .backup-zone { border:2px dashed var(--border); border-radius:var(--radius); padding:20px; text-align:center; cursor:pointer; transition:border-color .2s,background .2s; }
+  .backup-zone:hover { border-color:var(--primary); background:var(--primary-light); }
+  .backup-zone p { font-size:14px; color:var(--text2); margin-top:8px; }
+
+  /* PRINT TICKET */
+  @media print {
+    body * { display:none !important; }
+    #print-area, #print-area * { display:block !important; }
+    #print-area { font-family:'Courier New',monospace; font-size:12px; line-height:1.7; padding:0; margin:0; }
+  }
+
   @media(max-width:360px) {
     .stats-row { grid-template-columns:1fr; }
     .stat-val { font-size:14px; }
@@ -210,13 +233,16 @@
 </head>
 <body>
 
+<!-- PRINT AREA (oculto en pantalla, visible al imprimir) -->
+<div id="print-area" style="display:none;"></div>
+
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
     <div class="login-logo">
       <div class="logo-wrap">🛒</div>
-      <h1>T REX </h1>
-      <p>Tu punto de venta rapido y seguro</p>
+      <h1 id="login-biz-name">T'REX</h1>
+      <p>Tu punto de venta rápido y seguro</p>
     </div>
     <div class="form-group">
       <label>Usuario</label>
@@ -238,7 +264,7 @@
     <div class="topbar-brand">
       <div class="topbar-icon">🛒</div>
       <div>
-        <div class="topbar-title">T'REX</div>
+        <div class="topbar-title" id="topbar-biz-name">T'REX</div>
         <div class="topbar-user" id="topbar-user"></div>
       </div>
     </div>
@@ -347,12 +373,25 @@
     <!-- AJUSTES -->
     <div class="section" id="s-ajustes">
       <div class="section-title">Ajustes</div>
+
+      <!-- NEGOCIO -->
       <div class="card">
-        <div class="card-title">Cuenta</div>
+        <div class="card-title">🏪 Datos del negocio</div>
+        <div class="form-row"><label>Nombre del negocio</label><input type="text" id="cfg-biz-name" placeholder="Ej: Tienda El Sol"></div>
+        <div class="form-row"><label>Eslogan / descripción (opcional)</label><input type="text" id="cfg-biz-slogan" placeholder="Ej: Tu tienda de confianza"></div>
+        <div class="form-row"><label>Teléfono (opcional)</label><input type="text" id="cfg-biz-phone" placeholder="Ej: 771-123-4567" inputmode="tel"></div>
+        <button class="btn btn-primary" onclick="guardarNegocio()">💾 Guardar negocio</button>
+      </div>
+
+      <!-- CUENTA -->
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">👤 Cuenta</div>
         <div class="form-row"><label>Usuario actual</label><input type="text" id="cfg-user" placeholder="Nuevo usuario"></div>
         <div class="form-row"><label>Nueva contraseña</label><input type="password" id="cfg-pass" placeholder="Dejar en blanco para no cambiar"></div>
         <button class="btn btn-primary" onclick="guardarCuenta()">💾 Guardar cuenta</button>
       </div>
+
+      <!-- COLORES -->
       <div class="card" style="margin-top:14px;">
         <div class="card-title">🎨 Colores</div>
         <div class="settings-row"><label>Color principal</label><input type="color" id="c-primary" value="#1a56db" onchange="applyColors()"></div>
@@ -364,14 +403,33 @@
           <button class="btn btn-danger" onclick="resetColors()">↺ Restablecer</button>
         </div>
       </div>
+
+      <!-- RESPALDO -->
+      <div class="card" style="margin-top:14px;">
+        <div class="card-title">💾 Respaldo de datos</div>
+        <p style="font-size:13px;color:var(--text2);margin-bottom:14px;">Exporta todos tus datos (productos, ventas, ajustes) a un archivo JSON para respaldar o transferir a otro dispositivo.</p>
+        <div class="btn-row">
+          <button class="btn btn-primary" onclick="exportarJSON()">⬇️ Exportar JSON</button>
+          <button class="btn btn-outline" onclick="document.getElementById('import-file').click()">⬆️ Importar JSON</button>
+        </div>
+        <input type="file" id="import-file" accept=".json" style="display:none" onchange="importarJSON(event)">
+        <div class="backup-zone" style="margin-top:14px;" onclick="document.getElementById('import-file').click()">
+          <div style="font-size:32px;">📂</div>
+          <p>Toca aquí o arrastra un archivo .json para restaurar</p>
+        </div>
+      </div>
+
+      <!-- ZONA PELIGROSA -->
       <div class="card" style="margin-top:14px;">
         <div class="card-title">⚠️ Zona peligrosa</div>
         <button class="btn btn-danger" onclick="confirmar('¿Borrar historial?','Se borrarán TODAS las ventas. No se puede deshacer.',borrarVentas)">🗑 Borrar historial de ventas</button>
       </div>
+
+      <!-- INSTALAR -->
       <div class="card" style="margin-top:14px;">
         <div class="card-title">📱 Instalar app</div>
         <p style="font-size:13px;color:var(--text2);margin-bottom:12px;">Para instalar como app en Android: toca el menú del navegador (⋮) y selecciona <b>"Añadir a pantalla de inicio"</b> o <b>"Instalar app"</b>.</p>
-        <button class="btn btn-primary" id="manual-install-btn" onclick="triggerInstall()" style="display:none;">📲 Instalar VentaFácil</button>
+        <button class="btn btn-primary" id="manual-install-btn" onclick="triggerInstall()" style="display:none;">📲 Instalar T'REX</button>
       </div>
     </div>
 
@@ -398,7 +456,7 @@
 <div id="install-banner">
   <span style="font-size:26px;">📲</span>
   <div class="ib-text">
-    <div class="ib-title">Instalar VentaFácil</div>
+    <div class="ib-title">Instalar T'REX</div>
     <div>Úsala sin internet, como app nativa</div>
   </div>
   <button id="install-btn" onclick="triggerInstall()">Instalar</button>
@@ -436,6 +494,23 @@
   </div>
 </div>
 
+<!-- ===== MODAL TICKET ===== -->
+<div class="modal-overlay" id="modal-ticket">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="closeModal('modal-ticket')">✕</button>
+    <div class="modal-title">🧾 Ticket de venta</div>
+    <div class="ticket-body" id="ticket-preview"></div>
+    <div class="btn-row">
+      <button class="btn btn-primary" onclick="imprimirTicket()">🖨️ Imprimir</button>
+      <button class="btn btn-success" onclick="compartirWhatsApp()">💬 WhatsApp</button>
+    </div>
+    <div class="btn-row" style="margin-top:8px;">
+      <button class="btn btn-outline" onclick="copiarTicket()">📋 Copiar texto</button>
+    </div>
+  </div>
+</div>
+
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
@@ -453,6 +528,33 @@ function initDB() {
   if (!DB.get('productos')) DB.set('productos', []);
   if (!DB.get('ventas')) DB.set('ventas', []);
   if (!DB.get('colors')) DB.set('colors', {primary:'#1a56db',accent:'#059669',bg:'#F0F4FF',text:'#0f172a'});
+  if (!DB.get('negocio')) DB.set('negocio', {nombre:"T'REX", slogan:'Tu punto de venta rápido y seguro', telefono:''});
+}
+
+// ===== NEGOCIO =====
+function getNegocio() { return DB.get('negocio') || {nombre:"T'REX", slogan:'Tu punto de venta rápido y seguro', telefono:''}; }
+
+function actualizarNombreNegocio() {
+  const biz = getNegocio();
+  document.getElementById('topbar-biz-name').textContent = biz.nombre;
+  document.getElementById('login-biz-name').textContent = biz.nombre;
+  document.title = biz.nombre + ' — Punto de Venta';
+}
+
+function guardarNegocio() {
+  const nombre = document.getElementById('cfg-biz-name').value.trim() || "T'REX";
+  const slogan = document.getElementById('cfg-biz-slogan').value.trim();
+  const telefono = document.getElementById('cfg-biz-phone').value.trim();
+  DB.set('negocio', {nombre, slogan, telefono});
+  actualizarNombreNegocio();
+  toast('🏪 Datos del negocio guardados');
+}
+
+function loadNegocioForm() {
+  const biz = getNegocio();
+  document.getElementById('cfg-biz-name').value = biz.nombre || '';
+  document.getElementById('cfg-biz-slogan').value = biz.slogan || '';
+  document.getElementById('cfg-biz-phone').value = biz.telefono || '';
 }
 
 // ===== AUTH =====
@@ -471,6 +573,7 @@ function doLogin() {
     document.getElementById('app').style.display = 'flex';
     document.getElementById('topbar-user').textContent = '👤 ' + u;
     loadColors();
+    actualizarNombreNegocio();
     showSection('inicio');
     refreshInicio();
     renderInventario();
@@ -609,6 +712,7 @@ function renderInventario() {
 // ===== VENTAS =====
 let carrito = [];
 let foundProd = null;
+let lastVenta = null; // para el ticket
 
 function buscarProducto() {
   const q = document.getElementById('venta-input').value.trim().toLowerCase();
@@ -704,13 +808,120 @@ function cobrar() {
       if (p) p.stock -= ci.qty;
     });
     saveProductos(prods);
+    lastVenta = venta;
     carrito=[];
     renderCarrito();
     document.getElementById('found-card').classList.remove('visible');
     document.getElementById('venta-input').value='';
     toast('🎉 Venta registrada: '+fmt(total), 3000);
     refreshInicio();
+    // Preguntar si mostrar ticket
+    setTimeout(() => mostrarTicket(lastVenta), 600);
   });
+}
+
+// ===== TICKET =====
+function generarTextoTicket(venta) {
+  const biz = getNegocio();
+  const fecha = new Date(venta.fecha);
+  const fechaStr = fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const horaStr = fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  const sep = '--------------------------------';
+  let lineas = [];
+  lineas.push(biz.nombre.toUpperCase());
+  if (biz.slogan) lineas.push(biz.slogan);
+  if (biz.telefono) lineas.push('Tel: ' + biz.telefono);
+  lineas.push(sep);
+  lineas.push(`Fecha: ${fechaStr}  Hora: ${horaStr}`);
+  lineas.push(`Ticket #${String(venta.id).slice(-6)}`);
+  lineas.push(sep);
+  venta.items.forEach(item => {
+    const sub = (item.precio * item.qty).toFixed(2);
+    lineas.push(item.nombre.substring(0,24));
+    lineas.push(`  ${item.qty} x ${item.precio.toFixed(2).padStart(8)}  ${sub.padStart(10)}`);
+  });
+  lineas.push(sep);
+  lineas.push(`TOTAL:          MXN ${venta.total.toFixed(2)}`);
+  lineas.push(sep);
+  lineas.push('¡Gracias por tu compra!');
+  return lineas.join('\n');
+}
+
+function generarHTMLTicket(venta) {
+  const biz = getNegocio();
+  const fecha = new Date(venta.fecha);
+  const fechaStr = fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const horaStr = fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+  let rows = venta.items.map(item => {
+    const sub = (item.precio * item.qty).toFixed(2);
+    return `<div class="ticket-row"><span>${item.nombre.substring(0,22)}</span><span></span></div>
+            <div class="ticket-row" style="color:var(--text2);font-size:12px;padding-left:12px"><span>${item.qty} x MXN ${item.precio.toFixed(2)}</span><span>MXN ${sub}</span></div>`;
+  }).join('');
+  return `
+    <div class="ticket-header">
+      <div class="t-biz">${biz.nombre}</div>
+      ${biz.slogan ? `<div class="t-sub">${biz.slogan}</div>` : ''}
+      ${biz.telefono ? `<div class="t-sub">Tel: ${biz.telefono}</div>` : ''}
+    </div>
+    <hr>
+    <div class="ticket-row"><span>Fecha:</span><span>${fechaStr}</span></div>
+    <div class="ticket-row"><span>Hora:</span><span>${horaStr}</span></div>
+    <div class="ticket-row"><span>Ticket #:</span><span>${String(venta.id).slice(-6)}</span></div>
+    <hr>
+    ${rows}
+    <hr>
+    <div class="ticket-row bold"><span>TOTAL</span><span>MXN ${venta.total.toFixed(2)}</span></div>
+    <div class="ticket-footer" style="margin-top:12px">¡Gracias por tu compra! 🙏</div>
+  `;
+}
+
+function mostrarTicket(venta) {
+  if (!venta) return;
+  document.getElementById('ticket-preview').innerHTML = generarHTMLTicket(venta);
+  openModal('modal-ticket');
+}
+
+function imprimirTicket() {
+  if (!lastVenta) return;
+  const texto = generarTextoTicket(lastVenta);
+  const biz = getNegocio();
+  const printEl = document.getElementById('print-area');
+  printEl.innerHTML = `<pre style="font-family:Courier New,monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;padding:10px;">${texto}</pre>`;
+  printEl.style.display = 'block';
+  window.print();
+  printEl.style.display = 'none';
+  toast('🖨️ Enviado a imprimir');
+}
+
+function compartirWhatsApp() {
+  if (!lastVenta) return;
+  const texto = generarTextoTicket(lastVenta);
+  const url = 'https://wa.me/?text=' + encodeURIComponent(texto);
+  window.open(url, '_blank');
+}
+
+function copiarTicket() {
+  if (!lastVenta) return;
+  const texto = generarTextoTicket(lastVenta);
+  navigator.clipboard.writeText(texto).then(() => toast('📋 Copiado al portapapeles')).catch(() => {
+    // fallback
+    const ta = document.createElement('textarea');
+    ta.value = texto;
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('📋 Copiado al portapapeles');
+  });
+}
+
+// También permitir ver ticket de ventas anteriores desde el inicio
+function verTicketVenta(id) {
+  const ventas = DB.get('ventas') || [];
+  const v = ventas.find(x => x.id === id);
+  if (!v) return;
+  lastVenta = v;
+  mostrarTicket(v);
 }
 
 // ===== INICIO =====
@@ -730,11 +941,11 @@ function refreshInicio() {
   }
   uv.innerHTML = [...ventas].reverse().slice(0,5).map(v => {
     const hora = new Date(v.fecha).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
-    return `<div class="report-item">
+    return `<div class="report-item" style="cursor:pointer;" onclick="verTicketVenta(${v.id})">
       <span style="font-size:22px">🧾</span>
       <div style="flex:1;margin:0 10px">
         <div style="font-size:13px;font-weight:700">${v.items.map(i=>i.nombre).join(', ').substring(0,40)}${v.items.map(i=>i.nombre).join(', ').length>40?'…':''}</div>
-        <div style="font-size:11px;color:var(--text2)">${hora} · ${v.items.length} producto(s)</div>
+        <div style="font-size:11px;color:var(--text2)">${hora} · ${v.items.length} producto(s) · <span style="color:var(--primary)">Ver ticket</span></div>
       </div>
       <div style="font-weight:900;color:var(--accent);font-size:14px">${fmt(v.total)}</div>
     </div>`;
@@ -826,30 +1037,24 @@ function generarPDF(tipo) {
   const W = doc.internal.pageSize.getWidth();
   const H = doc.internal.pageSize.getHeight();
   const now = new Date();
+  const biz = getNegocio();
   const fechaStr = now.toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const horaStr = now.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
 
-  // ---- HEADER BAND ----
   doc.setFillColor(26,86,219);
   doc.rect(0,0,W,38,'F');
-
-  // White logo square
   doc.setFillColor(255,255,255,0.15);
   doc.roundedRect(12,8,22,22,4,4,'F');
   doc.setFontSize(16); doc.setTextColor(255,255,255);
   doc.text('🛒',15,23);
-
   doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
-  doc.text('VentaFácil',37,17);
+  doc.text(biz.nombre,37,17);
   doc.setFontSize(9); doc.setFont('helvetica','normal'); doc.setTextColor(200,220,255);
-  doc.text('Sistema Punto de Venta',37,24);
-
-  // Date on right
+  doc.text(biz.slogan || 'Sistema Punto de Venta',37,24);
   doc.setFontSize(9); doc.setTextColor(200,220,255);
   doc.text(fechaStr, W-14, 17, {align:'right'});
   doc.text('Generado: ' + horaStr, W-14, 24, {align:'right'});
 
-  // ---- REPORT TITLE ----
   let y = 48;
   let ventas, titulo, subtitulo;
   if (tipo==='dia') {
@@ -873,14 +1078,11 @@ function generarPDF(tipo) {
   doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(100,116,139);
   doc.text(subtitulo, 14, y+7);
   y += 18;
-
-  // Divider
   doc.setDrawColor(226,232,240); doc.setLineWidth(0.5);
   doc.line(14, y, W-14, y);
   y += 8;
 
   if (tipo === 'inventario') {
-    // KPI cards
     const prods = getProductos();
     const total = prods.reduce((s,p)=>s+p.precio*p.stock,0);
     pdfKpiRow(doc, y, W, [
@@ -913,68 +1115,46 @@ function generarPDF(tipo) {
     const total = ventas.reduce((s,v)=>s+v.total,0);
     const items = buildItemMap(ventas);
     const totalUds = items.reduce((s,x)=>s+x.qty,0);
-
-    // KPI cards
     pdfKpiRow(doc, y, W, [
       {label:'Total en ventas',val:fmt(total),color:[5,150,105]},
       {label:'Transacciones',val:ventas.length.toString(),color:[26,86,219]},
       {label:'Unidades vendidas',val:String(totalUds),color:[217,119,6]},
     ]);
     y += 26;
-
-    // Section header
     doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(26,86,219);
     doc.text('DETALLE POR PRODUCTO', 14, y);
     y += 6;
-
-    // Table header
     doc.setFillColor(26,86,219); doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(255,255,255);
     doc.rect(14,y,W-28,8,'F');
     doc.text('#',16,y+5.5); doc.text('Producto',26,y+5.5);
     doc.text('Unidades',W-62,y+5.5); doc.text('Total',W-30,y+5.5,{align:'right'});
     y += 8;
-
     items.forEach((p,i)=>{
       if (y > H-28) { doc.addPage(); y=20; }
-      // Row bg
       doc.setFillColor(i%2===0?255:248,250,252);
       if (i===0) doc.setFillColor(240,244,255);
       doc.rect(14,y,W-28,9,'F');
-
-      // Medal
       const medal = i===0?'1°':i===1?'2°':i===2?'3°':`${i+1}`;
       const mc = i===0?[26,86,219]:i===1?[100,116,139]:i===2?[217,119,6]:[100,116,139];
       doc.setFont('helvetica','bold'); doc.setFontSize(8); doc.setTextColor(...mc);
       doc.text(medal,17,y+6);
-
-      // Name
       doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor(15,23,42);
       doc.text(p.nombre.substring(0,42),26,y+6);
-
-      // Progress bar mini
       const pct = totalUds>0?p.qty/totalUds:0;
       doc.setFillColor(226,232,240); doc.roundedRect(26,y+7,80,2,1,1,'F');
       doc.setFillColor(26,86,219); doc.roundedRect(26,y+7,80*pct,2,1,1,'F');
-
-      // Units
       doc.setFontSize(9); doc.setTextColor(100,116,139);
       doc.text(`${p.qty} uds`,W-62,y+6);
-
-      // Total
       doc.setFont('helvetica','bold'); doc.setTextColor(5,150,105);
       doc.text(fmt(p.total),W-14,y+6,{align:'right'});
       y += 9;
     });
-
-    // Total row
     y += 3;
     doc.setFillColor(26,86,219); doc.rect(14,y,W-28,10,'F');
     doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(255,255,255);
     doc.text('TOTAL GENERAL', 18, y+7);
     doc.text(fmt(total), W-14, y+7, {align:'right'});
     y += 10;
-
-    // Ventas detail section
     if (ventas.length <= 30) {
       y += 8;
       if (y > H-40) { doc.addPage(); y=20; }
@@ -1001,14 +1181,13 @@ function generarPDF(tipo) {
     }
   }
 
-  // Footer
   const pages = doc.internal.getNumberOfPages();
   for (let i=1;i<=pages;i++) {
     doc.setPage(i);
     doc.setFillColor(248,250,252); doc.rect(0,H-12,W,12,'F');
     doc.setDrawColor(226,232,240); doc.line(0,H-12,W,H-12);
     doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(100,116,139);
-    doc.text('VentaFácil — Sistema Punto de Venta',14,H-4);
+    doc.text(biz.nombre + ' — Sistema Punto de Venta',14,H-4);
     doc.text(`Pág. ${i} de ${pages}`, W-14, H-4, {align:'right'});
   }
 
@@ -1034,13 +1213,71 @@ function pdfKpiRow(doc, y, W, kpis) {
   });
 }
 
-function exportarPDFInventario() {
-  generarPDF('inventario');
+function exportarPDFInventario() { generarPDF('inventario'); }
+
+// ===== RESPALDO JSON =====
+function exportarJSON() {
+  const datos = {
+    version: 2,
+    exportado: new Date().toISOString(),
+    negocio: DB.get('negocio'),
+    usuarios: DB.get('users'),
+    productos: DB.get('productos'),
+    ventas: DB.get('ventas'),
+    colores: DB.get('colors'),
+  };
+  const json = JSON.stringify(datos, null, 2);
+  const blob = new Blob([json], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const biz = getNegocio();
+  const fecha = new Date().toLocaleDateString('es-MX').replace(/\//g,'-');
+  a.href = url;
+  a.download = `respaldo_${biz.nombre.replace(/\s+/g,'_')}_${fecha}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('⬇️ Respaldo exportado correctamente', 3000);
+}
+
+function importarJSON(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const datos = JSON.parse(e.target.result);
+      if (!datos.productos && !datos.ventas) {
+        toast('⚠️ Archivo JSON no válido'); return;
+      }
+      confirmar(
+        '⬆️ Restaurar respaldo',
+        `Esto reemplazará TODOS tus datos actuales con los del archivo "${file.name}". ¿Continuar?`,
+        () => {
+          if (datos.negocio) DB.set('negocio', datos.negocio);
+          if (datos.usuarios) DB.set('users', datos.usuarios);
+          if (datos.productos) DB.set('productos', datos.productos);
+          if (datos.ventas) DB.set('ventas', datos.ventas);
+          if (datos.colores) DB.set('colors', datos.colores);
+          toast('✅ Datos restaurados correctamente', 3000);
+          loadColors();
+          actualizarNombreNegocio();
+          refreshInicio();
+          renderInventario();
+          loadAjustes();
+        }
+      );
+    } catch(err) {
+      toast('❌ Error al leer el archivo JSON');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
 }
 
 // ===== AJUSTES =====
 function loadAjustes() {
   document.getElementById('cfg-user').value = currentUser;
+  loadNegocioForm();
 }
 
 function guardarCuenta() {
@@ -1097,7 +1334,6 @@ window.addEventListener('beforeinstallprompt', e => {
     document.getElementById('manual-install-btn').style.display='block';
   }
 });
-
 function triggerInstall() {
   if (deferredPrompt) {
     deferredPrompt.prompt();
@@ -1111,13 +1347,12 @@ function dismissBanner() {
   sessionStorage.setItem('install_dismissed','1');
   document.getElementById('install-banner').classList.remove('show');
 }
-window.addEventListener('appinstalled', () => { toast('🎉 VentaFácil instalada',3000); dismissBanner(); });
+window.addEventListener('appinstalled', () => { toast('🎉 App instalada',3000); dismissBanner(); });
 
 // ===== INIT =====
 initDB();
 loadColors();
-
-// Register service worker
+actualizarNombreNegocio();
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('sw.js').catch(()=>{});
 }

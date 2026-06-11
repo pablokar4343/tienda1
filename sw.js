@@ -1,4 +1,4 @@
-const CACHE = 'ventafacil-v1';
+const CACHE = 'trex-v1';
 const ASSETS = [
   './',
   './index.html',

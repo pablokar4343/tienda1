@@ -1,4 +1,4 @@
-# 📱 VentaFácil — Guía de instalación en Android
+# 📱 T'REX — Guía de instalación en Android
 
 ## ¿Qué incluye este paquete?
 
@@ -19,8 +19,8 @@
 Recomendamos **Netlify** (gratis, 1 minuto):
 
 1. Ve a [netlify.com](https://netlify.com) → "Add new site" → "Deploy manually"
-2. Arrastra la carpeta `ventafacil` completa
-3. Netlify te dará una URL como: `https://ventafacil-abc123.netlify.app`
+2. Arrastra la carpeta `trex` completa
+3. Netlify te dará una URL como: `https://trex-abc123.netlify.app`
 
 Otras opciones gratuitas:
 - [GitHub Pages](https://pages.github.com) (sube los archivos a un repositorio)
@@ -31,7 +31,7 @@ Otras opciones gratuitas:
 
 1. Abre la URL en **Chrome para Android**
 2. Espera 3 segundos — aparecerá un banner azul en la parte inferior:
-   **"Instalar VentaFácil — Úsala sin internet"**
+   **"Instalar T'REX — Úsala sin internet"**
 3. Toca **Instalar** → ¡Listo!
 
 La app aparecerá en tu pantalla de inicio como cualquier app nativa.
@@ -47,7 +47,7 @@ Si no aparece el banner automáticamente:
 Si tienes una computadora en la misma red Wi-Fi:
 
 1. Instala Node.js en tu PC
-2. Abre terminal en la carpeta `ventafacil` y ejecuta:
+2. Abre terminal en la carpeta `trex` y ejecuta:
    ```
    npx serve .
    ```
@@ -81,7 +81,7 @@ Cámbialos en **Ajustes → Cuenta** después de entrar.
 
 ## 📄 Reportes PDF incluyen
 
-- Encabezado **VentaFácil** + fecha de generación
+- Encabezado **T'REX** + fecha de generación
 - Tarjetas de KPIs (total, transacciones, unidades)
 - Tabla de productos con ranking y barras de progreso
 - Historial de transacciones detallado
@@ -89,4 +89,4 @@ Cámbialos en **Ajustes → Cuenta** después de entrar.
 
 ---
 
-*VentaFácil — Tu punto de venta en el celular*
+*T'REX — Tu punto de venta en el celular*
