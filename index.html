@@ -244,8 +244,8 @@
       <p>Tu punto de venta rápido y seguro</p>
     </div>
     <div class="form-group">
-      <label>Usuario</label>
-      <input type="text" id="login-user" placeholder="Escribe tu usuario" autocomplete="username">
+     <label>Usuario</label>
+<select id="login-user"></select>
     </div>
     <div class="form-group">
       <label>Contraseña</label>
@@ -621,8 +621,24 @@ function sumarACaja(monto){
 
 // ===== AUTH =====
 let currentUser=null;
+
+function cargarUsuariosLogin(){
+  const users = DB.get('users') || [];
+
+  const select = document.getElementById('login-user');
+
+  select.innerHTML = '';
+
+  users.forEach(u=>{
+    const op = document.createElement('option');
+    op.value = u.user;
+    op.textContent = u.user;
+    select.appendChild(op);
+  });
+}
+
 function doLogin(){
-  const u=document.getElementById('login-user').value.trim();
+  const u=document.getElementById('login-user').value;
   const p=document.getElementById('login-pass').value;
   const users=DB.get('users')||[];
   const ok=users.find(x=>x.user===u&&x.pass===p);
@@ -643,7 +659,7 @@ function doLogout(){
   currentUser=null; DB.set('session_user',null);
   document.getElementById('app').style.display='none';
   document.getElementById('login-screen').style.display='flex';
-  document.getElementById('login-user').value='';
+  cargarUsuariosLogin();
   document.getElementById('login-pass').value='';
 }
 function restoreSession(){
@@ -800,14 +816,70 @@ function renderInventario(cat){
       <td>MXN ${fmtN(p.precio)}</td>
       <td style="${gColor};font-weight:800">MXN ${fmtN(g)}</td>
       <td>${p.stock} ${badge}</td>
-      <td><div class="action-col">
-        <button class="btn-sm btn-sm-primary" onclick="openModalProducto('${p.id}','${cat}')">✏️</button>
-        <button class="btn-sm btn-sm-danger" onclick="darDeBaja('${p.id}','${cat}')">🗑</button>
-      </div></td>
+      <td>
+<div class="action-col">
+
+<button class="btn-sm btn-success"
+onclick="ventaRapida('${p.id}','${cat}')">
+💰
+</button>
+
+<button class="btn-sm btn-sm-primary"
+onclick="openModalProducto('${p.id}','${cat}')">
+✏️
+</button>
+
+<button class="btn-sm btn-sm-danger"
+onclick="darDeBaja('${p.id}','${cat}')">
+🗑
+</button>
+
+</div>
+</td>
     </tr>`;
   });
   html+='</tbody></table>';
   wrap.innerHTML=html;
+}
+function ventaRapida(id,cat){
+
+  const producto = getProductos(cat)
+      .find(p => p.id === id);
+
+  if(!producto){
+    toast('Producto no encontrado');
+    return;
+  }
+
+  const cantidad = parseInt(
+    prompt(
+      `¿Cuántas unidades deseas vender de "${producto.nombre}"?`
+    )
+  );
+
+  if(!cantidad || cantidad < 1){
+    return;
+  }
+
+  if(cantidad > producto.stock){
+    toast('⚠️ Stock insuficiente');
+    return;
+  }
+
+  carrito = [{
+    id: producto.id,
+    nombre: producto.nombre,
+    precio: producto.precio,
+    costo: producto.costo || 0,
+    qty: cantidad,
+    cat: cat
+  }];
+
+  renderCarrito();
+
+  showSection('ventas');
+
+  toast('✅ Producto agregado para venta');
 }
 
 // ===== VENTAS =====
@@ -1411,6 +1483,7 @@ window.addEventListener('appinstalled',()=>{toast('🎉 App instalada',3000);dis
 
 // ===== INIT =====
 initDB();
+cargarUsuariosLogin();
 loadColors();
 actualizarNombreNegocio();
 restoreSession();
