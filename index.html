@@ -130,6 +130,13 @@
   .search-bar input{flex:1;padding:13px 14px;border:2px solid var(--border);border-radius:var(--radius-sm);font-size:15px;outline:none;transition:border-color .2s;color:var(--text);}
   .search-bar input:focus{border-color:var(--primary);}
   .search-bar button{padding:13px 16px;background:var(--primary);color:#fff;border:none;border-radius:var(--radius-sm);font-size:19px;cursor:pointer;}
+  .search-suggestions{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:var(--shadow);margin-bottom:14px;overflow:hidden;}
+  .suggest-item{padding:12px 14px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--border);font-size:13px;}
+  .suggest-item:last-child{border-bottom:none;}
+  .suggest-item:hover{background:var(--primary-light);}
+  .suggest-item strong{color:var(--text);}
+  .suggest-item small{color:var(--text2);}
+  .suggest-empty{padding:14px; color:var(--text2); text-align:center;}
   .found-card{background:var(--primary-light);border:2px solid var(--primary);border-radius:var(--radius);padding:16px;margin-bottom:14px;display:none;}
   .found-card.visible{display:block;}
   .found-card h3{font-size:16px;font-weight:800;color:var(--primary);}
@@ -305,9 +312,10 @@
     <div class="section" id="s-ventas">
       <div class="section-title">Nueva Venta</div>
       <div class="search-bar">
-        <input type="text" id="venta-input" placeholder="ID o nombre del producto..." onkeyup="if(event.key==='Enter')buscarProducto()">
+        <input type="text" id="venta-input" placeholder="ID o nombre del producto..." oninput="suggestProductos()" onkeyup="if(event.key==='Enter')buscarProducto()">
         <button onclick="buscarProducto()">🔍</button>
       </div>
+      <div class="search-suggestions" id="search-suggestions" style="display:none"></div>
       <div class="found-card" id="found-card">
         <h3 id="fp-nombre"></h3>
         <div class="found-price" id="fp-precio"></div>
@@ -918,6 +926,8 @@ function buscarProducto(){
     if(p){p._cat=cat;break;}
   }
   const fc=document.getElementById('found-card');
+  const suggestions=document.getElementById('search-suggestions');
+  suggestions.style.display='none';
   if(!p){fc.classList.remove('visible');toast('❌ Producto no encontrado');foundProd=null;return;}
   foundProd=p;
   document.getElementById('fp-nombre').textContent=p.nombre;
@@ -926,6 +936,52 @@ function buscarProducto(){
   document.getElementById('venta-qty').value=1;
   document.getElementById('venta-qty').max=p.stock;
   fc.classList.add('visible');
+}
+
+function suggestProductos(){
+  const q=document.getElementById('venta-input').value.trim().toLowerCase();
+  const suggestions=document.getElementById('search-suggestions');
+  const fc=document.getElementById('found-card');
+  fc.classList.remove('visible');
+  foundProd=null;
+  if(!q){suggestions.style.display='none';return;}
+  const matches=[];
+  for(const cat of['general','papeleria','verduleria']){
+    getProductos(cat).forEach(p=>{
+      const nombre=p.nombre.toLowerCase();
+      const id=p.id.toLowerCase();
+      if(nombre.includes(q)||id.includes(q)){
+        matches.push({
+          id:p.id,
+          nombre:p.nombre,
+          precio:p.precio,
+          stock:p.stock,
+          cat,
+        });
+      }
+    });
+  }
+  if(!matches.length){
+    suggestions.innerHTML='<div class="suggest-empty">No hay coincidencias</div>';
+    suggestions.style.display='block';
+    return;
+  }
+  suggestions.innerHTML=matches.slice(0,8).map(item=>{
+    return `<div class="suggest-item" onclick="selectSuggestion('${item.id}','${item.cat}')">
+      <div>
+        <strong>${item.nombre}</strong><br>
+        <small>${item.id} · ${item.cat}</small>
+      </div>
+      <div style="text-align:right;color:var(--text2);font-size:13px">${fmt(item.precio)}</div>
+    </div>`;
+  }).join('');
+  suggestions.style.display='block';
+}
+
+function selectSuggestion(id,cat){
+  document.getElementById('venta-input').value=id;
+  document.getElementById('search-suggestions').style.display='none';
+  buscarProducto();
 }
 
 function agregarAlCarrito(){
