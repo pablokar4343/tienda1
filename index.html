@@ -526,7 +526,7 @@
     <div class="settings-row" style="padding:12px 0;border-bottom:none;">
       <label style="font-size:13px;font-weight:700;color:var(--text);">
         <input type="checkbox" id="prod-por-gramos" style="width:16px;height:16px;cursor:pointer;margin-right:8px;">
-        Vendible por gramos
+        Vendible por kilogramos
       </label>
     </div>
     <div class="btn-row">
@@ -893,7 +893,7 @@ function ventaRapida(id,cat){
   if(producto.porGramos){
     cantidad = parseFloat(
       prompt(
-        `¿Cuántos gramos deseas vender de "${producto.nombre}"?`
+        `¿Cuántos kilogramos deseas vender de "${producto.nombre}"?`
       )
     );
   } else {
@@ -904,7 +904,7 @@ function ventaRapida(id,cat){
     );
   }
 
-  if(!cantidad || cantidad < 0.001){
+  if(!cantidad || cantidad < (producto.porGramos?0.01:1)){
     return;
   }
 
@@ -955,12 +955,12 @@ function buscarProducto(){
   const qtyInput=document.getElementById('venta-qty');
   const qtyLabel=document.getElementById('fp-qty-label');
   if(p.porGramos){
-    qtyLabel.textContent='Gramos';
+    qtyLabel.textContent='Kilogramos';
     qtyInput.type='number';
     qtyInput.inputMode='decimal';
-    qtyInput.min='0.1';
+    qtyInput.min='0.01';
     qtyInput.step='0.1';
-    qtyInput.value=100;
+    qtyInput.value=1;
   } else {
     qtyLabel.textContent='Cantidad';
     qtyInput.type='number';
@@ -1022,7 +1022,7 @@ function selectSuggestion(id,cat){
 function agregarAlCarrito(){
   if(!foundProd) return;
   const qty=foundProd.porGramos?parseFloat(document.getElementById('venta-qty').value):parseInt(document.getElementById('venta-qty').value);
-  if(!qty||qty<(foundProd.porGramos?0.001:1)){toast('Cantidad inválida');return;}
+  if(!qty||qty<(foundProd.porGramos?0.01:1)){toast('Cantidad inválida');return;}
   if(qty>foundProd.stock){toast('⚠️ Stock insuficiente');return;}
   const ex=carrito.find(c=>c.id===foundProd.id);
   if(ex){
@@ -1048,7 +1048,7 @@ function renderCarrito(){
     const sub=item.precio*item.qty;
     total+=sub;
     const qtyDisplay=item.porGramos?item.qty.toFixed(2):item.qty;
-    const unit=item.porGramos?'g':'u';
+    const unit=item.porGramos?'kg':'u';
     html+=`<div class="cart-item">
       <div class="cart-item-info">
         <div class="cart-item-name">${item.nombre}</div>
@@ -1070,9 +1070,9 @@ function renderCarrito(){
 function cambiarQty(idx,delta){
   const prod=getProductos(carrito[idx].cat).find(p=>p.id===carrito[idx].id);
   const nq=carrito[idx].qty+delta;
-  if(nq<(carrito[idx].porGramos?0.1:1)){carrito.splice(idx,1);renderCarrito();return;}
+  if(nq<(carrito[idx].porGramos?0.01:1)){carrito.splice(idx,1);renderCarrito();return;}
   if(prod&&nq>prod.stock){toast('⚠️ Stock máximo alcanzado');return;}
-  carrito[idx].qty=carrito[idx].porGramos?Math.round(nq*10)/10:Math.round(nq);
+  carrito[idx].qty=carrito[idx].porGramos?Math.round(nq*100)/100:Math.round(nq);
   renderCarrito();
 }
 
