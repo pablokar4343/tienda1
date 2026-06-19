@@ -321,7 +321,7 @@
         <div class="found-price" id="fp-precio"></div>
         <div class="found-stock" id="fp-stock"></div>
         <div class="form-row" style="margin-top:14px;margin-bottom:0">
-          <label>Cantidad</label>
+          <label id="fp-qty-label">Cantidad</label>
           <input type="number" id="venta-qty" min="1" value="1" inputmode="numeric" style="font-size:20px;font-weight:800;">
         </div>
         <div class="btn-row" style="margin-top:12px;">
@@ -523,6 +523,12 @@
       <span class="ganancia-badge" id="ganancia-badge-val">MXN 0.00 (0%)</span>
     </div>
     <div class="form-row"><label>Cantidad en stock</label><input type="number" id="prod-stock" placeholder="0" inputmode="numeric" min="0"></div>
+    <div class="settings-row" style="padding:12px 0;border-bottom:none;">
+      <label style="font-size:13px;font-weight:700;color:var(--text);">
+        <input type="checkbox" id="prod-por-gramos" style="width:16px;height:16px;cursor:pointer;margin-right:8px;">
+        Vendible por gramos
+      </label>
+    </div>
     <div class="btn-row">
       <button class="btn btn-danger" onclick="closeModal('modal-producto')">Cancelar</button>
       <button class="btn btn-success" onclick="guardarProducto()">💾 Guardar</button>
@@ -769,6 +775,7 @@ function openModalProducto(id,cat){
   document.getElementById('prod-edit-id').value=id||'';
   document.getElementById('prod-categoria').value=categoria;
   document.getElementById('ganancia-preview').style.display='none';
+  document.getElementById('prod-por-gramos').checked=false;
   const catLabel={general:'General',papeleria:'Papelería',verduleria:'Verdulería'};
   if(id){
     const p=getProductos(categoria).find(x=>x.id===id);
@@ -779,6 +786,7 @@ function openModalProducto(id,cat){
     document.getElementById('prod-costo').value=p.costo||0;
     document.getElementById('prod-precio').value=p.precio;
     document.getElementById('prod-stock').value=p.stock;
+    document.getElementById('prod-por-gramos').checked=p.porGramos||false;
     calcularGananciaModal();
   } else {
     document.getElementById('modal-prod-title').textContent=`➕ Nuevo — ${catLabel[categoria]}`;
@@ -796,15 +804,16 @@ function guardarProducto(){
   const costo=parseFloat(document.getElementById('prod-costo').value)||0;
   const precio=parseFloat(document.getElementById('prod-precio').value);
   const stock=parseInt(document.getElementById('prod-stock').value);
+  const porGramos=document.getElementById('prod-por-gramos').checked;
   if(!id||!nombre||isNaN(precio)||isNaN(stock)){toast('⚠️ Completa todos los campos');return;}
   if(precio<0||stock<0){toast('⚠️ Valores deben ser positivos');return;}
   let prods=getProductos(cat);
   if(editId){
-    prods=prods.map(p=>p.id===editId?{...p,nombre,costo,precio,stock}:p);
+    prods=prods.map(p=>p.id===editId?{...p,nombre,costo,precio,stock,porGramos}:p);
     toast('✅ Producto actualizado');
   } else {
     if(prods.find(p=>p.id===id)){toast('⚠️ El ID ya existe en esta categoría');return;}
-    prods.push({id,nombre,costo,precio,stock});
+    prods.push({id,nombre,costo,precio,stock,porGramos});
     toast('✅ Producto agregado');
   }
   prods.sort((a,b)=>a.id.localeCompare(b.id,undefined,{numeric:true}));
@@ -880,13 +889,22 @@ function ventaRapida(id,cat){
     return;
   }
 
-  const cantidad = parseInt(
-    prompt(
-      `¿Cuántas unidades deseas vender de "${producto.nombre}"?`
-    )
-  );
+  let cantidad;
+  if(producto.porGramos){
+    cantidad = parseFloat(
+      prompt(
+        `¿Cuántos gramos deseas vender de "${producto.nombre}"?`
+      )
+    );
+  } else {
+    cantidad = parseInt(
+      prompt(
+        `¿Cuántas unidades deseas vender de "${producto.nombre}"?`
+      )
+    );
+  }
 
-  if(!cantidad || cantidad < 1){
+  if(!cantidad || cantidad < 0.001){
     return;
   }
 
@@ -901,7 +919,8 @@ function ventaRapida(id,cat){
     precio: producto.precio,
     costo: producto.costo || 0,
     qty: cantidad,
-    cat: cat
+    cat: cat,
+    porGramos: producto.porGramos||false
   }];
 
   renderCarrito();
@@ -933,8 +952,24 @@ function buscarProducto(){
   document.getElementById('fp-nombre').textContent=p.nombre;
   document.getElementById('fp-precio').textContent=fmt(p.precio);
   document.getElementById('fp-stock').textContent='Stock disponible: '+p.stock;
-  document.getElementById('venta-qty').value=1;
-  document.getElementById('venta-qty').max=p.stock;
+  const qtyInput=document.getElementById('venta-qty');
+  const qtyLabel=document.getElementById('fp-qty-label');
+  if(p.porGramos){
+    qtyLabel.textContent='Gramos';
+    qtyInput.type='number';
+    qtyInput.inputMode='decimal';
+    qtyInput.min='0.1';
+    qtyInput.step='0.1';
+    qtyInput.value=100;
+  } else {
+    qtyLabel.textContent='Cantidad';
+    qtyInput.type='number';
+    qtyInput.inputMode='numeric';
+    qtyInput.min='1';
+    qtyInput.step='1';
+    qtyInput.value=1;
+  }
+  qtyInput.max=p.stock;
   fc.classList.add('visible');
 }
 
@@ -986,15 +1021,15 @@ function selectSuggestion(id,cat){
 
 function agregarAlCarrito(){
   if(!foundProd) return;
-  const qty=parseInt(document.getElementById('venta-qty').value);
-  if(!qty||qty<1){toast('Cantidad inválida');return;}
+  const qty=foundProd.porGramos?parseFloat(document.getElementById('venta-qty').value):parseInt(document.getElementById('venta-qty').value);
+  if(!qty||qty<(foundProd.porGramos?0.001:1)){toast('Cantidad inválida');return;}
   if(qty>foundProd.stock){toast('⚠️ Stock insuficiente');return;}
   const ex=carrito.find(c=>c.id===foundProd.id);
   if(ex){
     if(ex.qty+qty>foundProd.stock){toast('⚠️ No hay suficiente stock');return;}
     ex.qty+=qty;
   } else {
-    carrito.push({id:foundProd.id,nombre:foundProd.nombre,precio:foundProd.precio,costo:foundProd.costo||0,qty,cat:foundProd._cat||'general'});
+    carrito.push({id:foundProd.id,nombre:foundProd.nombre,precio:foundProd.precio,costo:foundProd.costo||0,qty,cat:foundProd._cat||'general',porGramos:foundProd.porGramos||false});
   }
   document.getElementById('found-card').classList.remove('visible');
   document.getElementById('venta-input').value='';
@@ -1012,15 +1047,17 @@ function renderCarrito(){
   carrito.forEach((item,i)=>{
     const sub=item.precio*item.qty;
     total+=sub;
+    const qtyDisplay=item.porGramos?item.qty.toFixed(2):item.qty;
+    const unit=item.porGramos?'g':'u';
     html+=`<div class="cart-item">
       <div class="cart-item-info">
         <div class="cart-item-name">${item.nombre}</div>
-        <div class="cart-item-price">${fmt(item.precio)} c/u</div>
+        <div class="cart-item-price">${fmt(item.precio)}/${unit}</div>
       </div>
       <div class="cart-qty">
-        <button class="qty-btn qty-minus" onclick="cambiarQty(${i},-1)">−</button>
-        <span class="qty-val">${item.qty}</span>
-        <button class="qty-btn qty-plus" onclick="cambiarQty(${i},1)">+</button>
+        <button class="qty-btn qty-minus" onclick="cambiarQty(${i},-${item.porGramos?'0.1':'1'})">−</button>
+        <span class="qty-val" style="min-width:${item.porGramos?'40px':'22px'}">${qtyDisplay}</span>
+        <button class="qty-btn qty-plus" onclick="cambiarQty(${i},${item.porGramos?'0.1':'1'})">+</button>
       </div>
       <div class="cart-item-subtotal">${fmt(sub)}</div>
     </div>`;
@@ -1033,9 +1070,9 @@ function renderCarrito(){
 function cambiarQty(idx,delta){
   const prod=getProductos(carrito[idx].cat).find(p=>p.id===carrito[idx].id);
   const nq=carrito[idx].qty+delta;
-  if(nq<1){carrito.splice(idx,1);renderCarrito();return;}
+  if(nq<(carrito[idx].porGramos?0.1:1)){carrito.splice(idx,1);renderCarrito();return;}
   if(prod&&nq>prod.stock){toast('⚠️ Stock máximo alcanzado');return;}
-  carrito[idx].qty=nq;
+  carrito[idx].qty=carrito[idx].porGramos?Math.round(nq*10)/10:Math.round(nq);
   renderCarrito();
 }
 
