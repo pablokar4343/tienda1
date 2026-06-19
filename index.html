@@ -348,9 +348,10 @@
     <!-- INVENTARIO GENERAL -->
     <div class="section" id="s-inventario">
       <div class="section-title">Inventario General</div>
-      <div class="btn-row" style="margin-bottom:14px;">
+      <div class="download-bar" style="margin-bottom:14px;">
         <button class="btn btn-primary" onclick="openModalProducto(null,'general')">➕ Agregar</button>
         <button class="btn btn-outline" onclick="exportarPDFInventario('general')">📄 PDF</button>
+        <button class="btn btn-success" onclick="exportarCSV('inventario')">📥 CSV</button>
       </div>
       <div class="table-wrap" id="tabla-inventario-wrap"></div>
     </div>
@@ -358,9 +359,10 @@
     <!-- PAPELERÍA -->
     <div class="section" id="s-papeleria">
       <div class="section-title">📝 Papelería</div>
-      <div class="btn-row" style="margin-bottom:14px;">
+      <div class="download-bar" style="margin-bottom:14px;">
         <button class="btn btn-primary" onclick="openModalProducto(null,'papeleria')">➕ Agregar</button>
         <button class="btn btn-outline" onclick="exportarPDFInventario('papeleria')">📄 PDF</button>
+        <button class="btn btn-success" onclick="exportarCSV('inventario')">📥 CSV</button>
       </div>
       <div class="table-wrap" id="tabla-papeleria-wrap"></div>
     </div>
@@ -368,9 +370,10 @@
     <!-- VERDULERÍA -->
     <div class="section" id="s-verduleria">
       <div class="section-title">🥦 Verdulería</div>
-      <div class="btn-row" style="margin-bottom:14px;">
+      <div class="download-bar" style="margin-bottom:14px;">
         <button class="btn btn-primary" onclick="openModalProducto(null,'verduleria')">➕ Agregar</button>
         <button class="btn btn-outline" onclick="exportarPDFInventario('verduleria')">📄 PDF</button>
+        <button class="btn btn-success" onclick="exportarCSV('inventario')">📥 CSV</button>
       </div>
       <div class="table-wrap" id="tabla-verduleria-wrap"></div>
     </div>
@@ -381,6 +384,7 @@
       <div class="download-bar">
         <button class="btn btn-primary" onclick="generarReporteDia()">📅 Reporte del día</button>
         <button class="btn btn-warn" onclick="generarReporteMes()">📆 Reporte mensual</button>
+        <button class="btn btn-success" onclick="exportarCSV('ventas')">📥 Exportar ventas CSV</button>
       </div>
       <div id="reporte-container"><div class="empty-state"><div class="empty-icon">📊</div><p>Selecciona un reporte arriba</p></div></div>
     </div>
@@ -1371,6 +1375,44 @@ function pdfKpiRow(doc,y,W,kpis){
   });
 }
 function exportarPDFInventario(cat){generarPDF('inventario');}
+
+function downloadText(text, filename){
+  const blob=new Blob(['\uFEFF'+text],{type:'text/csv;charset=utf-8;'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url; a.download=filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function exportarCSV(tipo){
+  let csv='';
+  let filename='';
+  if(tipo==='inventario'){
+    const rows=[];
+    ['general','papeleria','verduleria'].forEach(cat=>{
+      getProductos(cat).forEach(p=>{
+        rows.push([p.id,p.nombre,cat,p.costo||0,p.precio,(p.precio-(p.costo||0)).toFixed(2),p.stock]);
+      });
+    });
+    csv='ID,Nombre,Categoría,Costo,Precio,Ganancia,Stock\n';
+    csv+=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    filename=`inventario_${new Date().toLocaleDateString('es-MX').replace(/\//g,'-')}.csv`;
+  } else if(tipo==='ventas'){
+    const rows=[];
+    const ventas=DB.get('ventas')||[];
+    ventas.forEach(v=>{
+      rows.push([v.id,new Date(v.fecha).toLocaleString('es-MX'),v.total.toFixed(2),(v.ganancia||0).toFixed(2),v.pago.toFixed(2),v.cambio.toFixed(2)]);
+    });
+    csv='ID,Fecha,Total,Ganancia,Pago,Cambio\n';
+    csv+=rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    filename=`ventas_${new Date().toLocaleDateString('es-MX').replace(/\//g,'-')}.csv`;
+  } else {
+    toast('⚠️ Tipo de exportación desconocido');
+    return;
+  }
+  downloadText(csv,filename);
+}
 
 // ===== RESPALDO JSON =====
 function exportarJSON(){
