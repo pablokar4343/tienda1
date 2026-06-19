@@ -348,34 +348,49 @@
     <!-- INVENTARIO GENERAL -->
     <div class="section" id="s-inventario">
       <div class="section-title">Inventario General</div>
+      <div class="stats-row" id="stats-general"></div>
       <div class="download-bar" style="margin-bottom:14px;">
         <button class="btn btn-primary" onclick="openModalProducto(null,'general')">➕ Agregar</button>
         <button class="btn btn-outline" onclick="exportarPDFInventario('general')">📄 PDF</button>
         <button class="btn btn-success" onclick="exportarCSV('inventario')">📥 CSV</button>
       </div>
       <div class="table-wrap" id="tabla-inventario-wrap"></div>
+      <div class="card">
+        <div class="card-title">Ventas del día</div>
+        <div id="ventas-general-hoy"><div class="empty-state"><div class="empty-icon">🧾</div><p>No hay ventas hoy</p></div></div>
+      </div>
     </div>
 
     <!-- PAPELERÍA -->
     <div class="section" id="s-papeleria">
       <div class="section-title">📝 Papelería</div>
+      <div class="stats-row" id="stats-papeleria"></div>
       <div class="download-bar" style="margin-bottom:14px;">
         <button class="btn btn-primary" onclick="openModalProducto(null,'papeleria')">➕ Agregar</button>
         <button class="btn btn-outline" onclick="exportarPDFInventario('papeleria')">📄 PDF</button>
         <button class="btn btn-success" onclick="exportarCSV('inventario')">📥 CSV</button>
       </div>
       <div class="table-wrap" id="tabla-papeleria-wrap"></div>
+      <div class="card">
+        <div class="card-title">Ventas del día</div>
+        <div id="ventas-papeleria-hoy"><div class="empty-state"><div class="empty-icon">🧾</div><p>No hay ventas hoy</p></div></div>
+      </div>
     </div>
 
     <!-- VERDULERÍA -->
     <div class="section" id="s-verduleria">
       <div class="section-title">🥦 Verdulería</div>
+      <div class="stats-row" id="stats-verduleria"></div>
       <div class="download-bar" style="margin-bottom:14px;">
         <button class="btn btn-primary" onclick="openModalProducto(null,'verduleria')">➕ Agregar</button>
         <button class="btn btn-outline" onclick="exportarPDFInventario('verduleria')">📄 PDF</button>
         <button class="btn btn-success" onclick="exportarCSV('inventario')">📥 CSV</button>
       </div>
       <div class="table-wrap" id="tabla-verduleria-wrap"></div>
+      <div class="card">
+        <div class="card-title">Ventas del día</div>
+        <div id="ventas-verduleria-hoy"><div class="empty-state"><div class="empty-icon">🧾</div><p>No hay ventas hoy</p></div></div>
+      </div>
     </div>
 
     <!-- REPORTES -->
@@ -805,45 +820,47 @@ function renderInventario(cat){
   const wrap=document.getElementById(wrapId);
   if(!prods.length){
     wrap.innerHTML='<div class="empty-state"><div class="empty-icon">📦</div><p>Sin productos.<br>Toca "Agregar"</p></div>';
-    return;
+  } else {
+    let html='<table><thead><tr><th>ID</th><th>Nombre</th><th>Costo</th><th>Precio</th><th>Gan.</th><th>Stock</th><th></th></tr></thead><tbody>';
+    prods.forEach(p=>{
+      const g=(p.precio-(p.costo||0));
+      const gColor=g>=0?'color:#065f46':'color:#991b1b';
+      const badge=p.stock===0?'<span class="badge badge-red">Agotado</span>'
+        :p.stock<=5?'<span class="badge badge-orange">Bajo</span>'
+        :'<span class="badge badge-green">OK</span>';
+      html+=`<tr>
+        <td><b>${p.id}</b></td><td>${p.nombre}</td>
+        <td style="color:var(--text2)">MXN ${fmtN(p.costo||0)}</td>
+        <td>MXN ${fmtN(p.precio)}</td>
+        <td style="${gColor};font-weight:800">MXN ${fmtN(g)}</td>
+        <td>${p.stock} ${badge}</td>
+        <td>
+  <div class="action-col">
+
+  <button class="btn-sm btn-success"
+  onclick="ventaRapida('${p.id}','${cat}')">
+  💰
+  </button>
+
+  <button class="btn-sm btn-sm-primary"
+  onclick="openModalProducto('${p.id}','${cat}')">
+  ✏️
+  </button>
+
+  <button class="btn-sm btn-sm-danger"
+  onclick="darDeBaja('${p.id}','${cat}')">
+  🗑
+  </button>
+
+  </div>
+  </td>
+      </tr>`;
+    });
+    html+='</tbody></table>';
+    wrap.innerHTML=html;
   }
-  let html='<table><thead><tr><th>ID</th><th>Nombre</th><th>Costo</th><th>Precio</th><th>Gan.</th><th>Stock</th><th></th></tr></thead><tbody>';
-  prods.forEach(p=>{
-    const g=(p.precio-(p.costo||0));
-    const gColor=g>=0?'color:#065f46':'color:#991b1b';
-    const badge=p.stock===0?'<span class="badge badge-red">Agotado</span>'
-      :p.stock<=5?'<span class="badge badge-orange">Bajo</span>'
-      :'<span class="badge badge-green">OK</span>';
-    html+=`<tr>
-      <td><b>${p.id}</b></td><td>${p.nombre}</td>
-      <td style="color:var(--text2)">MXN ${fmtN(p.costo||0)}</td>
-      <td>MXN ${fmtN(p.precio)}</td>
-      <td style="${gColor};font-weight:800">MXN ${fmtN(g)}</td>
-      <td>${p.stock} ${badge}</td>
-      <td>
-<div class="action-col">
-
-<button class="btn-sm btn-success"
-onclick="ventaRapida('${p.id}','${cat}')">
-💰
-</button>
-
-<button class="btn-sm btn-sm-primary"
-onclick="openModalProducto('${p.id}','${cat}')">
-✏️
-</button>
-
-<button class="btn-sm btn-sm-danger"
-onclick="darDeBaja('${p.id}','${cat}')">
-🗑
-</button>
-
-</div>
-</td>
-    </tr>`;
-  });
-  html+='</tbody></table>';
-  wrap.innerHTML=html;
+  renderCategoryStats(cat);
+  renderVentasHoy(cat);
 }
 function ventaRapida(id,cat){
 
@@ -1161,6 +1178,67 @@ function buildItemMap(ventas){
     m[i.id].ganancia+=(i.precio-i.costo)*i.qty;
   }));
   return Object.values(m).sort((a,b)=>b.qty-a.qty);
+}
+
+function calcularStatsPorCategoria(cat){
+  const hoy=new Date().toDateString();
+  const ventas=(DB.get('ventas')||[]).filter(v=>new Date(v.fecha).toDateString()===hoy);
+  const ventasCat=ventas.map(v=>({
+    ...v,
+    items:v.items.filter(i=>(i.cat||'general')===cat)
+  })).filter(v=>v.items.length);
+  const total=ventasCat.reduce((s,v)=>s+v.items.reduce((ss,i)=>ss+i.precio*i.qty,0),0);
+  const ganancia=ventasCat.reduce((s,v)=>s+v.items.reduce((ss,i)=>ss+(i.precio-i.costo)*i.qty,0),0);
+  const transacciones=ventasCat.length;
+  const productosVendidos=ventasCat.reduce((s,v)=>s+v.items.reduce((ss,i)=>ss+i.qty,0),0);
+  return {total,ganancia,transacciones,productosVendidos};
+}
+
+function renderCategoryStats(cat){
+  const statsId={general:'stats-general',papeleria:'stats-papeleria',verduleria:'stats-verduleria'}[cat];
+  const container=document.getElementById(statsId);
+  if(!container) return;
+  const stats=calcularStatsPorCategoria(cat);
+  container.innerHTML=`
+    <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon green">💰</div><div><div class="stat-val green">${fmt(stats.total)}</div><div class="stat-lbl">Ventas hoy</div></div></div></div>
+    <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon purple">📈</div><div><div class="stat-val purple">${fmt(stats.ganancia)}</div><div class="stat-lbl">Ganancia</div></div></div></div>
+    <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon blue">🧾</div><div><div class="stat-val blue">${stats.transacciones}</div><div class="stat-lbl">Transacciones</div></div></div></div>
+    <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon orange">📦</div><div><div class="stat-val orange">${stats.productosVendidos}</div><div class="stat-lbl">Productos vendidos</div></div></div></div>
+  `;
+}
+
+function renderVentasHoy(cat){
+  const idMap={general:'ventas-general-hoy',papeleria:'ventas-papeleria-hoy',verduleria:'ventas-verduleria-hoy'}[cat];
+  const container=document.getElementById(idMap);
+  if(!container) return;
+  const hoy=new Date().toDateString();
+  const ventas=(DB.get('ventas')||[]).filter(v=>new Date(v.fecha).toDateString()===hoy);
+  const ventasCat=ventas.map(v=>({
+    ...v,
+    items:v.items.filter(i=>i.cat===cat)
+  })).filter(v=>v.items.length);
+  if(!ventasCat.length){
+    container.innerHTML='<div class="empty-state"><div class="empty-icon">🧾</div><p>No hay ventas hoy</p></div>';
+    return;
+  }
+  container.innerHTML=ventasCat.reverse().slice(0,4).map(v=>{
+    const hora=new Date(v.fecha).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
+    const nombres=v.items.map(i=>`${i.qty}×${i.nombre}`).join(', ');
+    const total=v.items.reduce((s,i)=>s+i.precio*i.qty,0);
+    const ganancia=v.items.reduce((s,i)=>s+(i.precio-i.costo)*i.qty,0);
+    return `<div class="report-item" style="padding:12px;border-bottom:1px solid var(--border)">
+      <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+        <div style="min-width:0;flex:1">
+          <div style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nombres.substring(0,50)}${nombres.length>50?'…':''}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">${hora}</div>
+        </div>
+        <div style="text-align:right;white-space:nowrap">
+          <div style="font-weight:900;color:var(--accent);font-size:13px">${fmt(total)}</div>
+          <div style="font-size:10px;color:var(--purple)">+${fmt(ganancia)}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function generarReporteDia(){
