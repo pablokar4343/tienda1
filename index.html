@@ -356,6 +356,19 @@
     <!-- INVENTARIO GENERAL -->
     <div class="section" id="s-inventario">
       <div class="section-title">Inventario General</div>
+      <div class="search-bar">
+        <input type="text" id="inventario-input" placeholder="Buscar ID o nombre..." oninput="suggestProductosInventario()" onkeyup="if(event.key==='Enter')buscarProductoInventario()">
+        <button onclick="buscarProductoInventario()">🔍</button>
+      </div>
+      <div class="search-suggestions" id="inventario-search-suggestions" style="display:none"></div>
+      <div class="found-card" id="inventario-found-card">
+        <h3 id="inv-nombre"></h3>
+        <div class="found-price" id="inv-precio"></div>
+        <div class="found-stock" id="inv-stock"></div>
+        <div class="found-stock" id="inv-costo"></div>
+        <div class="found-stock" id="inv-ganancia"></div>
+        <div class="found-stock" id="inv-categoria"></div>
+      </div>
       <div class="stats-row" id="stats-general"></div>
       <div class="download-bar" style="margin-bottom:14px;">
         <button class="btn btn-primary" onclick="openModalProducto(null,'general')">➕ Agregar</button>
@@ -1017,6 +1030,67 @@ function selectSuggestion(id,cat){
   document.getElementById('venta-input').value=id;
   document.getElementById('search-suggestions').style.display='none';
   buscarProducto();
+}
+
+function buscarProductoInventario(){
+  const q=document.getElementById('inventario-input').value.trim().toLowerCase();
+  const resultsCard=document.getElementById('inventario-found-card');
+  const suggestions=document.getElementById('inventario-search-suggestions');
+  suggestions.style.display='none';
+  if(!q){resultsCard.classList.remove('visible'); return;}
+  let prod=null;
+  for(const cat of['general','papeleria','verduleria']){
+    const p=getProductos(cat).find(x=>x.id.toLowerCase()===q||x.nombre.toLowerCase().includes(q));
+    if(p){prod={...p,_cat:cat};break;}
+  }
+  if(!prod){resultsCard.classList.remove('visible'); toast('❌ Producto no encontrado'); return;}
+  document.getElementById('inv-nombre').textContent=prod.nombre;
+  document.getElementById('inv-precio').textContent='Precio: '+fmt(prod.precio);
+  document.getElementById('inv-stock').textContent='Stock: '+prod.stock+(prod.porGramos?' kg':' unidades');
+  document.getElementById('inv-costo').textContent='Costo: '+fmt(prod.costo||0);
+  const ganancia=prod.precio-(prod.costo||0);
+  document.getElementById('inv-ganancia').textContent='Ganancia por unidad: '+fmt(ganancia);
+  document.getElementById('inv-categoria').textContent='Categoría: '+(prod._cat==='general'?'General':prod._cat==='papeleria'?'Papelería':'Verdulería');
+  resultsCard.classList.add('visible');
+}
+
+function suggestProductosInventario(){
+  const q=document.getElementById('inventario-input').value.trim().toLowerCase();
+  const suggestions=document.getElementById('inventario-search-suggestions');
+  const resultsCard=document.getElementById('inventario-found-card');
+  resultsCard.classList.remove('visible');
+  if(!q){suggestions.style.display='none';return;}
+  const matches=[];
+  for(const cat of['general','papeleria','verduleria']){
+    getProductos(cat).forEach(p=>{
+      const nombre=p.nombre.toLowerCase();
+      const id=p.id.toLowerCase();
+      if(nombre.includes(q)||id.includes(q)){
+        matches.push({id:p.id,nombre:p.nombre,precio:p.precio,cat});
+      }
+    });
+  }
+  if(!matches.length){
+    suggestions.innerHTML='<div class="suggest-empty">No hay coincidencias</div>';
+    suggestions.style.display='block';
+    return;
+  }
+  suggestions.innerHTML=matches.slice(0,8).map(item=>{
+    return `<div class="suggest-item" onclick="selectSuggestionInventario('${item.id}','${item.cat}')">
+      <div>
+        <strong>${item.nombre}</strong><br>
+        <small>${item.id} · ${item.cat}</small>
+      </div>
+      <div style="text-align:right;color:var(--text2);font-size:13px">${fmt(item.precio)}</div>
+    </div>`;
+  }).join('');
+  suggestions.style.display='block';
+}
+
+function selectSuggestionInventario(id,cat){
+  document.getElementById('inventario-input').value=id;
+  document.getElementById('inventario-search-suggestions').style.display='none';
+  buscarProductoInventario();
 }
 
 function agregarAlCarrito(){
