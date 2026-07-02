@@ -113,6 +113,13 @@
   .form-row .hint{font-size:11px;color:var(--text2);margin-top:4px;}
   .form-row .ganancia-badge{display:inline-block;margin-top:6px;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:var(--accent-light);color:var(--accent);}
   .form-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .switch-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--bg);}
+  .switch{position:relative;display:inline-flex;align-items:center;}
+  .switch input{display:none;}
+  .switch span{width:44px;height:24px;background:#cbd5e1;border-radius:999px;display:inline-block;position:relative;cursor:pointer;transition:background .2s;}
+  .switch span::before{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s;}
+  .switch input:checked + span{background:var(--primary);} 
+  .switch input:checked + span::before{transform:translateX(20px);} 
   .btn-row{display:flex;gap:10px;margin-top:10px;}
   .btn-row .btn{flex:1;padding:13px;}
   .btn-sm{padding:7px 11px;border:none;border-radius:8px;font-size:11px;font-weight:700;cursor:pointer;transition:all .15s;}
@@ -323,6 +330,17 @@
           <label id="fp-qty-label">Cantidad</label>
           <input type="number" id="venta-qty" min="1" value="1" inputmode="numeric" style="font-size:20px;font-weight:800;">
         </div>
+        <div class="form-row" id="venta-peso-toggle" style="display:none;margin-top:10px;margin-bottom:0;">
+          <label>Unidad de venta</label>
+          <div class="switch-row">
+            <span id="venta-unidad-text">kg</span>
+            <label class="switch">
+              <input type="checkbox" id="venta-weight-toggle" onchange="toggleVentaUnidad()">
+              <span></span>
+            </label>
+            <span>g</span>
+          </div>
+        </div>
         <div class="btn-row" style="margin-top:12px;">
           <button class="btn btn-success" onclick="agregarAlCarrito()">➕ Agregar al carrito</button>
         </div>
@@ -416,9 +434,19 @@
     <!-- REPORTES -->
     <div class="section" id="s-reportes">
       <div class="section-title">Reportes</div>
+      <div class="card" style="margin-bottom:14px;">
+        <div class="form-row" style="margin-bottom:0;">
+          <label>Periodo</label>
+          <div class="form-cols">
+            <select id="reporte-mes-select"></select>
+            <select id="reporte-anio-select"></select>
+          </div>
+        </div>
+      </div>
       <div class="download-bar">
         <button class="btn btn-primary" onclick="generarReporteDia()">📅 Reporte del día</button>
         <button class="btn btn-warn" onclick="generarReporteMes()">📆 Reporte mensual</button>
+        <button class="btn btn-purple" onclick="generarReporteAnual()">📊 Reporte anual</button>
         <button class="btn btn-success" onclick="exportarCSV('ventas')">📥 Exportar ventas CSV</button>
       </div>
       <div id="reporte-container"><div class="empty-state"><div class="empty-icon">📊</div><p>Selecciona un reporte arriba</p></div></div>
@@ -569,10 +597,12 @@
     <div class="modal-title">🧾 Ticket de venta</div>
     <div class="ticket-body" id="ticket-preview"></div>
     <div class="btn-row">
+      <button class="btn btn-outline" onclick="closeModal('modal-ticket')">Cancelar</button>
+      <button class="btn btn-success" id="ticket-confirm-btn" onclick="confirmarVentaDesdeTicket()">✅ Cobrar</button>
+    </div>
+    <div class="btn-row" id="ticket-post-sale-actions" style="margin-top:8px;display:none;">
       <button class="btn btn-primary" onclick="imprimirTicket()">🖨️ Imprimir</button>
       <button class="btn btn-success" onclick="compartirWhatsApp()">💬 WhatsApp</button>
-    </div>
-    <div class="btn-row" style="margin-top:8px;">
       <button class="btn btn-outline" onclick="copiarTicket()">📋 Copiar texto</button>
     </div>
   </div>
@@ -606,7 +636,24 @@ const DB={
 };
 function fmt(v){return 'MXN '+Number(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
 function fmtN(v){return Number(v).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g,',');}
-
+function normalizarTexto(text){return String(text||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();}
+function getProductosPorCategoria(cat){return getProductos(cat)||[];}
+function encontrarProductosPorTexto(q, cats=['general','papeleria','verduleria']){
+  const query=normalizarTexto(q);
+  if(!query) return [];
+  const resultados=[];
+  cats.forEach(cat=>{
+    getProductosPorCategoria(cat).forEach(p=>{
+      const id=normalizarTexto(p.id);
+      const nombre=normalizarTexto(p.nombre);
+      const texto=normalizarTexto(`${p.id} ${p.nombre} ${cat}`);
+      if(id===query||nombre===query||id.startsWith(query)||nombre.includes(query)||texto.includes(query)){
+        resultados.push({...p,_cat:cat});
+      }
+    });
+  });
+  return resultados;
+}
 function initDB(){
   if(!DB.get('users')) DB.set('users',[{user:'admin',pass:'1234'}]);
   if(!DB.get('productos')) DB.set('productos',[]);
@@ -743,6 +790,7 @@ function showSection(name){
   if(name==='inventario') renderInventario('general');
   if(name==='papeleria') renderInventario('papeleria');
   if(name==='verduleria') renderInventario('verduleria');
+  if(name==='reportes') cargarFiltrosReportes();
   if(name==='ajustes') loadAjustes();
 }
 
@@ -925,11 +973,11 @@ function ventaRapida(id,cat){
     return;
   }
 
-  carrito = [{
+  carrito=[{
     id: producto.id,
     nombre: producto.nombre,
     precio: producto.precio,
-    costo: producto.costo || 0,
+    costo: producto.costo||0,
     qty: cantidad,
     cat: cat,
     porGramos: producto.porGramos||false
@@ -947,77 +995,106 @@ let carrito=[];
 let foundProd=null;
 let lastVenta=null;
 
-function buscarProducto(){
-  const q=document.getElementById('venta-input').value.trim().toLowerCase();
-  if(!q){toast('Escribe un ID o nombre');return;}
-  // Buscar en todas las categorías
-  let p=null;
-  for(const cat of['general','papeleria','verduleria']){
-    p=getProductos(cat).find(x=>x.id.toLowerCase()===q||x.nombre.toLowerCase().includes(q));
-    if(p){p._cat=cat;break;}
-  }
-  const fc=document.getElementById('found-card');
-  const suggestions=document.getElementById('search-suggestions');
-  suggestions.style.display='none';
-  if(!p){fc.classList.remove('visible');toast('❌ Producto no encontrado');foundProd=null;return;}
-  foundProd=p;
-  document.getElementById('fp-nombre').textContent=p.nombre;
-  document.getElementById('fp-precio').textContent=fmt(p.precio);
-  document.getElementById('fp-stock').textContent='Stock disponible: '+p.stock;
+function mostrarProductoEncontrado(producto, origen='venta'){
+  if(!producto) return;
+  foundProd=producto;
+  const fc=document.getElementById(origen==='venta'?'found-card':'inventario-found-card');
   const qtyInput=document.getElementById('venta-qty');
   const qtyLabel=document.getElementById('fp-qty-label');
-  if(p.porGramos){
-    qtyLabel.textContent='Kilogramos';
+  const toggleRow=document.getElementById('venta-peso-toggle');
+  const toggle=document.getElementById('venta-weight-toggle');
+  const unidadText=document.getElementById('venta-unidad-text');
+  if(origen==='venta'){
+    document.getElementById('fp-nombre').textContent=producto.nombre;
+    document.getElementById('fp-precio').textContent=fmt(producto.precio);
+    document.getElementById('fp-stock').textContent='Stock disponible: '+producto.stock;
+    if(producto.porGramos){
+      toggleRow.style.display='block';
+      toggle.checked=false;
+      unidadText.textContent='kg';
+      qtyLabel.textContent='Cantidad';
+      qtyInput.type='number';
+      qtyInput.inputMode='decimal';
+      qtyInput.min='0.01';
+      qtyInput.step='0.1';
+      qtyInput.value='1';
+    } else {
+      toggleRow.style.display='none';
+      qtyLabel.textContent='Cantidad';
+      qtyInput.type='number';
+      qtyInput.inputMode='numeric';
+      qtyInput.min='1';
+      qtyInput.step='1';
+      qtyInput.value='1';
+    }
+    qtyInput.max=producto.stock;
+    fc.classList.add('visible');
+  }
+}
+function getVentaUnidad(){
+  return document.getElementById('venta-weight-toggle')?.checked ? 'gr' : 'kg';
+}
+function convertirCantidadVenta(valor, destino){
+  const num=parseFloat(valor)||0;
+  if(destino==='gr') return num*1000;
+  return num/1000;
+}
+function obtenerCantidadVenta(){
+  const qtyInput=document.getElementById('venta-qty');
+  const valor=parseFloat(qtyInput.value)||0;
+  return getVentaUnidad()==='gr' ? valor/1000 : valor;
+}
+function toggleVentaUnidad(){
+  if(!foundProd||!foundProd.porGramos) return;
+  const toggle=document.getElementById('venta-weight-toggle');
+  const unidadText=document.getElementById('venta-unidad-text');
+  const qtyInput=document.getElementById('venta-qty');
+  const actual=parseFloat(qtyInput.value)||0;
+  const next=toggle.checked ? convertirCantidadVenta(actual,'gr') : convertirCantidadVenta(actual,'kg');
+  unidadText.textContent=toggle.checked?'g':'kg';
+  if(toggle.checked){
+    qtyInput.type='number';
+    qtyInput.inputMode='numeric';
+    qtyInput.min='1';
+    qtyInput.step='50';
+    qtyInput.value=Math.round(next).toString();
+  } else {
     qtyInput.type='number';
     qtyInput.inputMode='decimal';
     qtyInput.min='0.01';
     qtyInput.step='0.1';
-    qtyInput.value=1;
-  } else {
-    qtyLabel.textContent='Cantidad';
-    qtyInput.type='number';
-    qtyInput.inputMode='numeric';
-    qtyInput.min='1';
-    qtyInput.step='1';
-    qtyInput.value=1;
+    qtyInput.value=(Math.round(next*100)/100).toString();
   }
-  qtyInput.max=p.stock;
-  fc.classList.add('visible');
+}
+function buscarProducto(){
+  const q=document.getElementById('venta-input').value.trim();
+  if(!q){toast('Escribe un ID o nombre');return;}
+  const matches=encontrarProductosPorTexto(q);
+  const fc=document.getElementById('found-card');
+  const suggestions=document.getElementById('search-suggestions');
+  suggestions.style.display='none';
+  if(!matches.length){fc.classList.remove('visible');toast('❌ Producto no encontrado');foundProd=null;return;}
+  mostrarProductoEncontrado(matches[0],'venta');
 }
 
 function suggestProductos(){
-  const q=document.getElementById('venta-input').value.trim().toLowerCase();
+  const q=document.getElementById('venta-input').value.trim();
   const suggestions=document.getElementById('search-suggestions');
   const fc=document.getElementById('found-card');
   fc.classList.remove('visible');
   foundProd=null;
   if(!q){suggestions.style.display='none';return;}
-  const matches=[];
-  for(const cat of['general','papeleria','verduleria']){
-    getProductos(cat).forEach(p=>{
-      const nombre=p.nombre.toLowerCase();
-      const id=p.id.toLowerCase();
-      if(nombre.includes(q)||id.includes(q)){
-        matches.push({
-          id:p.id,
-          nombre:p.nombre,
-          precio:p.precio,
-          stock:p.stock,
-          cat,
-        });
-      }
-    });
-  }
+  const matches=encontrarProductosPorTexto(q);
   if(!matches.length){
     suggestions.innerHTML='<div class="suggest-empty">No hay coincidencias</div>';
     suggestions.style.display='block';
     return;
   }
   suggestions.innerHTML=matches.slice(0,8).map(item=>{
-    return `<div class="suggest-item" onclick="selectSuggestion('${item.id}','${item.cat}')">
+    return `<div class="suggest-item" onclick="selectSuggestion('${item.id}','${item._cat}')">
       <div>
         <strong>${item.nombre}</strong><br>
-        <small>${item.id} · ${item.cat}</small>
+        <small>${item.id} · ${item._cat}</small>
       </div>
       <div style="text-align:right;color:var(--text2);font-size:13px">${fmt(item.precio)}</div>
     </div>`;
@@ -1028,21 +1105,19 @@ function suggestProductos(){
 function selectSuggestion(id,cat){
   document.getElementById('venta-input').value=id;
   document.getElementById('search-suggestions').style.display='none';
-  buscarProducto();
+  const p=getProductos(cat).find(x=>x.id===id);
+  if(p){mostrarProductoEncontrado({...p,_cat:cat},'venta');}
 }
 
 function buscarProductoInventario(){
-  const q=document.getElementById('inventario-input').value.trim().toLowerCase();
+  const q=document.getElementById('inventario-input').value.trim();
   const resultsCard=document.getElementById('inventario-found-card');
   const suggestions=document.getElementById('inventario-search-suggestions');
   suggestions.style.display='none';
   if(!q){resultsCard.classList.remove('visible'); return;}
-  let prod=null;
-  for(const cat of['general','papeleria','verduleria']){
-    const p=getProductos(cat).find(x=>x.id.toLowerCase()===q||x.nombre.toLowerCase().includes(q));
-    if(p){prod={...p,_cat:cat};break;}
-  }
-  if(!prod){resultsCard.classList.remove('visible'); toast('❌ Producto no encontrado'); return;}
+  const matches=encontrarProductosPorTexto(q);
+  if(!matches.length){resultsCard.classList.remove('visible'); toast('❌ Producto no encontrado'); return;}
+  const prod=matches[0];
   document.getElementById('inv-nombre').textContent=prod.nombre;
   document.getElementById('inv-precio').textContent='Precio: '+fmt(prod.precio);
   document.getElementById('inv-stock').textContent='Stock: '+prod.stock+(prod.porGramos?' kg':' unidades');
@@ -1054,31 +1129,22 @@ function buscarProductoInventario(){
 }
 
 function suggestProductosInventario(){
-  const q=document.getElementById('inventario-input').value.trim().toLowerCase();
+  const q=document.getElementById('inventario-input').value.trim();
   const suggestions=document.getElementById('inventario-search-suggestions');
   const resultsCard=document.getElementById('inventario-found-card');
   resultsCard.classList.remove('visible');
   if(!q){suggestions.style.display='none';return;}
-  const matches=[];
-  for(const cat of['general','papeleria','verduleria']){
-    getProductos(cat).forEach(p=>{
-      const nombre=p.nombre.toLowerCase();
-      const id=p.id.toLowerCase();
-      if(nombre.includes(q)||id.includes(q)){
-        matches.push({id:p.id,nombre:p.nombre,precio:p.precio,cat});
-      }
-    });
-  }
+  const matches=encontrarProductosPorTexto(q);
   if(!matches.length){
     suggestions.innerHTML='<div class="suggest-empty">No hay coincidencias</div>';
     suggestions.style.display='block';
     return;
   }
   suggestions.innerHTML=matches.slice(0,8).map(item=>{
-    return `<div class="suggest-item" onclick="selectSuggestionInventario('${item.id}','${item.cat}')">
+    return `<div class="suggest-item" onclick="selectSuggestionInventario('${item.id}','${item._cat}')">
       <div>
         <strong>${item.nombre}</strong><br>
-        <small>${item.id} · ${item.cat}</small>
+        <small>${item.id} · ${item._cat}</small>
       </div>
       <div style="text-align:right;color:var(--text2);font-size:13px">${fmt(item.precio)}</div>
     </div>`;
@@ -1089,26 +1155,48 @@ function suggestProductosInventario(){
 function selectSuggestionInventario(id,cat){
   document.getElementById('inventario-input').value=id;
   document.getElementById('inventario-search-suggestions').style.display='none';
-  buscarProductoInventario();
+  const p=getProductos(cat).find(x=>x.id===id);
+  if(p){
+    const prod={...p,_cat:cat};
+    document.getElementById('inv-nombre').textContent=prod.nombre;
+    document.getElementById('inv-precio').textContent='Precio: '+fmt(prod.precio);
+    document.getElementById('inv-stock').textContent='Stock: '+prod.stock+(prod.porGramos?' kg':' unidades');
+    document.getElementById('inv-costo').textContent='Costo: '+fmt(prod.costo||0);
+    const ganancia=prod.precio-(prod.costo||0);
+    document.getElementById('inv-ganancia').textContent='Ganancia por unidad: '+fmt(ganancia);
+    document.getElementById('inv-categoria').textContent='Categoría: '+(prod._cat==='general'?'General':prod._cat==='papeleria'?'Papelería':'Verdulería');
+    document.getElementById('inventario-found-card').classList.add('visible');
+  }
 }
 
 function agregarAlCarrito(){
   if(!foundProd) return;
-  const qty=foundProd.porGramos?parseFloat(document.getElementById('venta-qty').value):parseInt(document.getElementById('venta-qty').value);
+  const qty=obtenerCantidadVenta();
   if(!qty||qty<(foundProd.porGramos?0.01:1)){toast('Cantidad inválida');return;}
   if(qty>foundProd.stock){toast('⚠️ Stock insuficiente');return;}
-  const ex=carrito.find(c=>c.id===foundProd.id);
+  const ex=carrito.find(c=>c.id===foundProd.id && c.cat===foundProd._cat);
   if(ex){
     if(ex.qty+qty>foundProd.stock){toast('⚠️ No hay suficiente stock');return;}
     ex.qty+=qty;
   } else {
-    carrito.push({id:foundProd.id,nombre:foundProd.nombre,precio:foundProd.precio,costo:foundProd.costo||0,qty,cat:foundProd._cat||'general',porGramos:foundProd.porGramos||false});
+    carrito.push({id:foundProd.id,nombre:foundProd.nombre,precio:foundProd.precio,costo:foundProd.costo||0,qty,cat:foundProd._cat||'general',porGramos:foundProd.porGramos||false,unidad:getVentaUnidad()});
   }
   document.getElementById('found-card').classList.remove('visible');
   document.getElementById('venta-input').value='';
   foundProd=null;
   renderCarrito();
   toast('✅ Agregado al carrito');
+}
+
+function editarPrecioItem(index, valor){
+  const item=carrito[index];
+  if(!item) return;
+  const nuevo=parseFloat(valor);
+  if(isNaN(nuevo)||nuevo<0) return;
+  carrito[index].precio=nuevo;
+  renderCarrito();
+  if(document.getElementById('pago-cliente')) calcularCambio();
+  toast('💲 Precio actualizado');
 }
 
 function renderCarrito(){
@@ -1120,8 +1208,8 @@ function renderCarrito(){
   carrito.forEach((item,i)=>{
     const sub=item.precio*item.qty;
     total+=sub;
-    const qtyDisplay=item.porGramos?item.qty.toFixed(2):item.qty;
-    const unit=item.porGramos?'kg':'u';
+    const qtyDisplay=item.porGramos?(item.unidad==='gr'?`${Math.round(item.qty*1000)} g`:`${item.qty.toFixed(2)} kg`):item.qty;
+    const unit=item.porGramos?(item.unidad==='gr'?'g':'kg'):'u';
     html+=`<div class="cart-item">
       <div class="cart-item-info">
         <div class="cart-item-name">${item.nombre}</div>
@@ -1129,10 +1217,11 @@ function renderCarrito(){
       </div>
       <div class="cart-qty">
         <button class="qty-btn qty-minus" onclick="cambiarQty(${i},-${item.porGramos?'0.1':'1'})">−</button>
-        <span class="qty-val" style="min-width:${item.porGramos?'40px':'22px'}">${qtyDisplay}</span>
+        <span class="qty-val" style="min-width:${item.porGramos?'60px':'22px'}">${qtyDisplay}</span>
         <button class="qty-btn qty-plus" onclick="cambiarQty(${i},${item.porGramos?'0.1':'1'})">+</button>
       </div>
       <div class="cart-item-subtotal">${fmt(sub)}</div>
+      <input type="number" min="0" step="0.01" value="${item.precio.toFixed(2)}" style="width:78px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:12px;" onchange="editarPrecioItem(${i}, this.value)">
     </div>`;
   });
   el.innerHTML=html;
@@ -1179,36 +1268,58 @@ function limpiarCarrito(){
 function cobrar(){
   if(!carrito.length) return;
   const total=carrito.reduce((s,i)=>s+i.precio*i.qty,0);
-  const ganancia=carrito.reduce((s,i)=>s+(i.precio-i.costo)*i.qty,0);
   const pago=parseFloat(document.getElementById('pago-cliente').value)||0;
   if(pago>0&&pago<total){toast('⚠️ El pago es menor al total');return;}
   const cambio=pago>0?pago-total:0;
-  const cambioStr=pago>0?`\nPago: ${fmt(pago)} | Cambio: ${fmt(cambio)}`:'';
-  confirmar('✅ Confirmar cobro',`Total: ${fmt(total)}${cambioStr}\n¿Confirmar la venta?`,()=>{
-    const venta={id:Date.now(),fecha:new Date().toISOString(),items:[...carrito],total,ganancia,pago,cambio};
-    const ventas=DB.get('ventas')||[];
-    ventas.push(venta);
-    DB.set('ventas',ventas);
-    // Descontar stock por categoría
-    carrito.forEach(ci=>{
-      let prods=getProductos(ci.cat);
-      const p=prods.find(x=>x.id===ci.id);
-      if(p){p.stock-=ci.qty;}
-      saveProductos(ci.cat,prods);
-    });
-    sumarACaja(total);
-    lastVenta=venta;
-    carrito=[];
-    renderCarrito();
-    document.getElementById('found-card').classList.remove('visible');
-    document.getElementById('venta-input').value='';
-    document.getElementById('pago-cliente').value='';
-    document.getElementById('cambio-result').textContent='—';
-    toast('🎉 Venta registrada: '+fmt(total),3000);
-    refreshInicio();
-    renderInventario('general');renderInventario('papeleria');renderInventario('verduleria');
-    setTimeout(()=>mostrarTicket(lastVenta),600);
+  mostrarVistaTicketPreventa(total,pago,cambio);
+}
+
+function mostrarVistaTicketPreventa(total,pago,cambio){
+  const venta={
+    id:Date.now(),
+    fecha:new Date().toISOString(),
+    items:carrito,
+    total,
+    ganancia:carrito.reduce((s,i)=>s+(i.precio-i.costo)*i.qty,0),
+    pago,
+    cambio
+  };
+  document.getElementById('ticket-preview').innerHTML=generarHTMLTicket(venta,true);
+  document.getElementById('ticket-confirm-btn').style.display='inline-block';
+  document.getElementById('ticket-post-sale-actions').style.display='none';
+  openModal('modal-ticket');
+}
+
+function confirmarVentaDesdeTicket(){
+  if(!carrito.length) return;
+  const total=carrito.reduce((s,i)=>s+i.precio*i.qty,0);
+  const pago=parseFloat(document.getElementById('pago-cliente').value)||0;
+  if(pago>0&&pago<total){toast('⚠️ El pago es menor al total');closeModal('modal-ticket');return;}
+  const cambio=pago>0?pago-total:0;
+  const ganancia=carrito.reduce((s,i)=>s+(i.precio-i.costo)*i.qty,0);
+  const venta={id:Date.now(),fecha:new Date().toISOString(),items:[...carrito.map(c=>({...c}))],total,ganancia,pago,cambio};
+  const ventas=DB.get('ventas')||[];
+  ventas.push(venta);
+  DB.set('ventas',ventas);
+  carrito.forEach(ci=>{
+    let prods=getProductos(ci.cat);
+    const p=prods.find(x=>x.id===ci.id);
+    if(p){p.stock-=ci.qty;}
+    saveProductos(ci.cat,prods);
   });
+  sumarACaja(total);
+  lastVenta=venta;
+  carrito=[];
+  renderCarrito();
+  document.getElementById('found-card').classList.remove('visible');
+  document.getElementById('venta-input').value='';
+  document.getElementById('pago-cliente').value='';
+  document.getElementById('cambio-result').textContent='—';
+  closeModal('modal-ticket');
+  toast('🎉 Venta registrada: '+fmt(total),3000);
+  refreshInicio();
+  renderInventario('general');renderInventario('papeleria');renderInventario('verduleria');
+  setTimeout(()=>mostrarTicket(lastVenta),600);
 }
 
 // ===== TICKET =====
@@ -1227,8 +1338,9 @@ function generarTextoTicket(venta){
   L.push(`Ticket #${String(venta.id).slice(-6)}`);
   L.push(sep);
   venta.items.forEach(item=>{
+    const qtyLabel=item.porGramos?(item.unidad==='gr'?`${Math.round(item.qty*1000)} g`:`${item.qty.toFixed(2)} kg`):`${item.qty}`;
     L.push(item.nombre.substring(0,24));
-    L.push(`  ${item.qty} x ${item.precio.toFixed(2).padStart(8)}  ${(item.precio*item.qty).toFixed(2).padStart(10)}`);
+    L.push(`  ${qtyLabel} x ${item.precio.toFixed(2).padStart(8)}  ${(item.precio*item.qty).toFixed(2).padStart(10)}`);
   });
   L.push(sep);
   L.push(`TOTAL:          MXN ${venta.total.toFixed(2)}`);
@@ -1241,15 +1353,17 @@ function generarTextoTicket(venta){
   return L.join('\n');
 }
 
-function generarHTMLTicket(venta){
+function generarHTMLTicket(venta, editable=false){
   const biz=getNegocio();
   const fecha=new Date(venta.fecha);
   const fechaStr=fecha.toLocaleDateString('es-MX',{day:'2-digit',month:'2-digit',year:'numeric'});
   const horaStr=fecha.toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'});
-  let rows=venta.items.map(item=>{
+  let rows=venta.items.map((item,index)=>{
     const sub=(item.precio*item.qty).toFixed(2);
+    const qtyLabel=item.porGramos?(item.unidad==='gr'?`${Math.round(item.qty*1000)} g`:`${item.qty.toFixed(2)} kg`):`${item.qty}`;
+    const editPriceInput=editable?`<div class="ticket-row" style="justify-content:flex-end;padding-left:12px"><input type="number" min="0" step="0.01" value="${item.precio.toFixed(2)}" style="width:90px;padding:6px 8px;border:1px solid var(--border);border-radius:8px;font-size:12px;" onchange="editarPrecioTicket(${index}, this.value)"></div>`:'';
     return `<div class="ticket-row"><span>${item.nombre.substring(0,22)}</span><span></span></div>
-      <div class="ticket-row" style="color:var(--text2);font-size:12px;padding-left:12px"><span>${item.qty} x MXN ${item.precio.toFixed(2)}</span><span>MXN ${sub}</span></div>`;
+      <div class="ticket-row" style="color:var(--text2);font-size:12px;padding-left:12px"><span>${qtyLabel} x MXN ${item.precio.toFixed(2)}</span><span>MXN ${sub}</span></div>${editPriceInput}`;
   }).join('');
   const cambioRow=venta.pago>0?`
     <div class="ticket-row" style="margin-top:4px"><span>Pago cliente:</span><span>MXN ${venta.pago.toFixed(2)}</span></div>
@@ -1268,9 +1382,45 @@ function generarHTMLTicket(venta){
   <div class="ticket-footer" style="margin-top:12px">¡Gracias por tu compra! 🙏</div>`;
 }
 
+function editarPrecioTicket(index, valor){
+  const nuevo=parseFloat(valor);
+  if(isNaN(nuevo)||nuevo<0) return;
+  if(carrito.length){
+    carrito[index].precio=nuevo;
+    const total=carrito.reduce((s,i)=>s+i.precio*i.qty,0);
+    const pago=parseFloat(document.getElementById('pago-cliente').value)||0;
+    const cambio=pago>0?pago-total:0;
+    const ganancia=carrito.reduce((s,i)=>s+(i.precio-i.costo)*i.qty,0);
+    document.getElementById('ticket-preview').innerHTML=generarHTMLTicket({id:Date.now(),fecha:new Date().toISOString(),items:carrito,total,ganancia,pago,cambio},true);
+    renderCarrito();
+  } else {
+    const venta=lastVenta;
+    if(!venta||!venta.items[index]) return;
+    const itemAnterior=venta.items[index];
+    const costo=itemAnterior.costo||0;
+    venta.items[index].precio=nuevo;
+    venta.total=venta.items.reduce((s,i)=>s+i.precio*i.qty,0);
+    venta.ganancia=venta.items.reduce((s,i)=>s+(i.precio-(i.costo||0))*i.qty,0);
+    venta.cambio=venta.pago>0?venta.pago-venta.total:0;
+    const ventas=DB.get('ventas')||[];
+    const idx=ventas.findIndex(v=>v.id===venta.id);
+    if(idx>=0){
+      ventas[idx]={...venta};
+      DB.set('ventas',ventas);
+      lastVenta=ventas[idx];
+    }
+    document.getElementById('ticket-preview').innerHTML=generarHTMLTicket(lastVenta,true);
+    refreshInicio();
+  }
+  toast('💲 Precio actualizado');
+}
+
 function mostrarTicket(venta){
   if(!venta) return;
-  document.getElementById('ticket-preview').innerHTML=generarHTMLTicket(venta);
+  lastVenta=venta;
+  document.getElementById('ticket-preview').innerHTML=generarHTMLTicket(venta,true);
+  document.getElementById('ticket-confirm-btn').style.display='none';
+  document.getElementById('ticket-post-sale-actions').style.display='flex';
   openModal('modal-ticket');
 }
 function imprimirTicket(){
@@ -1442,17 +1592,34 @@ function generarReporteDia(){
   container.innerHTML=html;
 }
 
+function cargarFiltrosReportes(){
+  const mesSelect=document.getElementById('reporte-mes-select');
+  const anioSelect=document.getElementById('reporte-anio-select');
+  if(!mesSelect||!anioSelect) return;
+  const ventas=DB.get('ventas')||[];
+  const years=[...new Set(ventas.map(v=>new Date(v.fecha).getFullYear()).concat(new Date().getFullYear()))].sort((a,b)=>a-b);
+  const mesActual=new Date().getMonth();
+  const anioActual=new Date().getFullYear();
+  mesSelect.innerHTML=Array.from({length:12},(_,i)=>`<option value="${i}" ${i===mesActual?'selected':''}>${new Date(2024,i,1).toLocaleDateString('es-MX',{month:'long'})}</option>`).join('');
+  anioSelect.innerHTML=years.map(y=>`<option value="${y}" ${y===anioActual?'selected':''}>${y}</option>`).join('');
+}
+
+function getPeriodoReporte(){
+  const mesSelect=document.getElementById('reporte-mes-select');
+  const anioSelect=document.getElementById('reporte-anio-select');
+  return {mes:parseInt(mesSelect?.value||new Date().getMonth(),10), anio:parseInt(anioSelect?.value||new Date().getFullYear(),10)};
+}
+
 function generarReporteMes(){
-  const ahora=new Date();
-  const mes=ahora.getMonth(),año=ahora.getFullYear();
-  const ventas=(DB.get('ventas')||[]).filter(v=>{const d=new Date(v.fecha);return d.getMonth()===mes&&d.getFullYear()===año;});
+  const {mes,anio}=getPeriodoReporte();
+  const ventas=(DB.get('ventas')||[]).filter(v=>{const d=new Date(v.fecha);return d.getMonth()===mes&&d.getFullYear()===anio;});
   const container=document.getElementById('reporte-container');
-  if(!ventas.length){container.innerHTML='<div class="empty-state"><div class="empty-icon">📆</div><p>No hay ventas este mes</p></div>';return;}
+  if(!ventas.length){container.innerHTML='<div class="empty-state"><div class="empty-icon">📆</div><p>No hay ventas en este periodo</p></div>';return;}
   const total=ventas.reduce((s,v)=>s+v.total,0);
   const ganancia=ventas.reduce((s,v)=>s+(v.ganancia||0),0);
   const items=buildItemMap(ventas);
   const totalUds=items.reduce((s,x)=>s+x.qty,0);
-  const nombreMes=ahora.toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+  const nombreMes=new Date(anio,mes,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});
   let html=`<div class="card">
     <div class="card-title">📆 Reporte mensual — ${nombreMes}</div>
     <div class="stats-row" style="margin-bottom:14px">
@@ -1481,6 +1648,29 @@ function generarReporteMes(){
   html+=`<div class="btn-row" style="margin-top:16px">
     <button class="btn btn-warn" onclick="generarPDF('mes')">📄 Descargar PDF</button>
   </div></div>`;
+  container.innerHTML=html;
+}
+
+function generarReporteAnual(){
+  const {anio}=getPeriodoReporte();
+  const ventas=(DB.get('ventas')||[]).filter(v=>new Date(v.fecha).getFullYear()===anio);
+  const container=document.getElementById('reporte-container');
+  if(!ventas.length){container.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><p>No hay ventas para este año</p></div>';return;}
+  const meses=Array.from({length:12},(_,i)=>({label:new Date(2024,i,1).toLocaleDateString('es-MX',{month:'long'}), total:0, ganancia:0, ventas:0}));
+  ventas.forEach(v=>{const d=new Date(v.fecha); const idx=d.getMonth(); meses[idx].total+=v.total; meses[idx].ganancia+=(v.ganancia||0); meses[idx].ventas+=1;});
+  const total=meses.reduce((s,m)=>s+m.total,0);
+  const ganancia=meses.reduce((s,m)=>s+m.ganancia,0);
+  let html=`<div class="card">
+    <div class="card-title">📊 Reporte anual — ${anio}</div>
+    <div class="stats-row" style="margin-bottom:14px">
+      <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon green">💰</div><div><div class="stat-val green">${fmt(total)}</div><div class="stat-lbl">Ventas año</div></div></div></div>
+      <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon purple">📈</div><div><div class="stat-val purple">${fmt(ganancia)}</div><div class="stat-lbl">Ganancia año</div></div></div></div>
+      <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon blue">🧾</div><div><div class="stat-val blue">${ventas.length}</div><div class="stat-lbl">Transacciones</div></div></div></div>
+      <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon orange">📆</div><div><div class="stat-val orange">${meses.filter(m=>m.total>0).length}</div><div class="stat-lbl">Meses con ventas</div></div></div></div>
+    </div>
+    <div class="card-title">Por meses</div>`;
+  meses.forEach(m=>{ if(m.total>0){ html+=`<div class="report-item"><div style="flex:1"><div class="report-name">${m.label}</div><div style="font-size:11px;color:var(--text2);margin-top:3px">${m.ventas} ventas</div></div><div style="text-align:right"><div style="font-weight:800;color:var(--accent);font-size:13px">${fmt(m.total)}</div><div style="font-size:10px;color:var(--purple)">+${fmt(m.ganancia)}</div></div></div>`; }});
+  html+=`</div>`;
   container.innerHTML=html;
 }
 
