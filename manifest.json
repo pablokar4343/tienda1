@@ -1,6 +1,6 @@
 {
-  "name": "T'REX - Punto de Venta",
-  "short_name": "T'REX",
+  "name": "T´REX - Punto de Venta",
+  "short_name": "T REX",
   "description": "Tu punto de venta en el celular",
   "start_url": "./index.html",
   "display": "standalone",

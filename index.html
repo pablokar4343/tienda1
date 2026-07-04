@@ -209,6 +209,13 @@
   .progress-bar{background:var(--border);border-radius:99px;height:5px;margin-top:5px;overflow:hidden;}
   .progress-fill{background:var(--primary);height:100%;border-radius:99px;}
   .ganancia-tag{display:inline-block;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;background:var(--accent-light);color:var(--accent);margin-left:6px;}
+  .weekly-chart{display:flex;flex-direction:column;gap:10px;margin:4px 0 18px;}
+  .weekly-chart-row{display:grid;grid-template-columns:minmax(82px,1fr) minmax(110px,1.45fr) auto;gap:9px;align-items:center;}
+  .weekly-chart-label{min-width:0;font-size:12px;font-weight:800;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .weekly-chart-track{height:18px;background:var(--bg);border:1px solid var(--border);border-radius:99px;overflow:hidden;}
+  .weekly-chart-fill{height:100%;min-width:8px;border-radius:99px;background:linear-gradient(90deg,var(--primary),var(--accent));}
+  .weekly-chart-value{text-align:right;font-size:11px;font-weight:800;color:var(--accent);white-space:nowrap;}
+  .weekly-chart-meta{font-size:10px;color:var(--text2);margin-top:2px;}
 
   /* ACTIONS */
   .action-col{display:flex;gap:5px;}
@@ -811,8 +818,19 @@ function confirmar(title,msg,cb){
 
 // ===== INVENTARIO =====
 const CAT_KEY={general:'productos',papeleria:'papeleria',verduleria:'verduleria'};
+const CAT_LABEL={general:'General',papeleria:'Papeleria',verduleria:'Verduleria'};
+const PRODUCT_CATS=Object.keys(CAT_KEY);
 function getProductos(cat){return DB.get(CAT_KEY[cat]||'productos')||[];}
 function saveProductos(cat,p){DB.set(CAT_KEY[cat]||'productos',p);}
+
+function buscarProductoPorIdGlobal(id){
+  const target=normalizarTexto(id);
+  for(const cat of PRODUCT_CATS){
+    const producto=getProductos(cat).find(p=>normalizarTexto(p.id)===target);
+    if(producto) return {...producto,_cat:cat};
+  }
+  return null;
+}
 
 function calcularGananciaModal(){
   const costo=parseFloat(document.getElementById('prod-costo').value)||0;
@@ -867,6 +885,10 @@ function guardarProducto(){
   const porGramos=document.getElementById('prod-por-gramos').checked;
   if(!id||!nombre||isNaN(precio)||isNaN(stock)){toast('⚠️ Completa todos los campos');return;}
   if(precio<0||stock<0){toast('⚠️ Valores deben ser positivos');return;}
+  if(!editId){
+    const existente=buscarProductoPorIdGlobal(id);
+    if(existente){toast(`âš ï¸ El ID ya existe en ${CAT_LABEL[existente._cat]}`);return;}
+  }
   let prods=getProductos(cat);
   if(editId){
     prods=prods.map(p=>p.id===editId?{...p,nombre,costo,precio,stock,porGramos}:p);
@@ -1496,6 +1518,56 @@ function buildItemMap(ventas){
   return Object.values(m).sort((a,b)=>b.qty-a.qty);
 }
 
+function getRangoSemanaActual(base=new Date()){
+  const inicio=new Date(base);
+  const dia=inicio.getDay();
+  const diff=dia===0?-6:1-dia;
+  inicio.setDate(inicio.getDate()+diff);
+  inicio.setHours(0,0,0,0);
+  const fin=new Date(inicio);
+  fin.setDate(inicio.getDate()+6);
+  fin.setHours(23,59,59,999);
+  return {inicio,fin};
+}
+
+function getVentasSemanaActual(){
+  const {inicio,fin}=getRangoSemanaActual();
+  return (DB.get('ventas')||[]).filter(v=>{
+    const d=new Date(v.fecha);
+    return d>=inicio&&d<=fin;
+  });
+}
+
+function fmtQty(qty){
+  const n=Number(qty)||0;
+  return Number.isInteger(n)?String(n):n.toFixed(2).replace(/\.?0+$/,'');
+}
+
+function renderTopProductosSemana(ventasSemana){
+  const top=buildItemMap(ventasSemana).slice(0,8);
+  const {inicio,fin}=getRangoSemanaActual();
+  const rango=`${inicio.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})} - ${fin.toLocaleDateString('es-MX',{day:'2-digit',month:'short'})}`;
+  if(!top.length){
+    return `<div class="card-title">Top 8 productos de la semana</div>
+      <div class="empty-state" style="padding:20px 12px"><div class="empty-icon">ðŸ“Š</div><p>No hay ventas esta semana</p></div>`;
+  }
+  const maxQty=Math.max(...top.map(p=>p.qty),1);
+  return `<div class="card-title">Top 8 productos de la semana <span style="text-transform:none;letter-spacing:0;color:var(--primary);font-weight:800">(${rango})</span></div>
+    <div class="weekly-chart">
+      ${top.map((p,i)=>{
+        const pct=Math.max(6,Math.round((p.qty/maxQty)*100));
+        return `<div class="weekly-chart-row">
+          <div>
+            <div class="weekly-chart-label">#${i+1} ${p.nombre}</div>
+            <div class="weekly-chart-meta">${fmt(p.total)}</div>
+          </div>
+          <div class="weekly-chart-track"><div class="weekly-chart-fill" style="width:${pct}%"></div></div>
+          <div class="weekly-chart-value">${fmtQty(p.qty)} uds</div>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 function calcularStatsPorCategoria(cat){
   const hoy=new Date().toDateString();
   const ventas=(DB.get('ventas')||[]).filter(v=>new Date(v.fecha).toDateString()===hoy);
@@ -1565,6 +1637,7 @@ function generarReporteDia(){
   const total=ventas.reduce((s,v)=>s+v.total,0);
   const ganancia=ventas.reduce((s,v)=>s+(v.ganancia||0),0);
   const items=buildItemMap(ventas);
+  const ventasSemana=getVentasSemanaActual();
   const fecha=new Date().toLocaleDateString('es-MX',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   let html=`<div class="card">
     <div class="card-title">📅 Reporte del día — ${fecha}</div>
@@ -1574,6 +1647,7 @@ function generarReporteDia(){
       <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon blue">🧾</div><div><div class="stat-val blue">${ventas.length}</div><div class="stat-lbl">Transacciones</div></div></div></div>
       <div class="stat-card"><div class="stat-card-inner"><div class="stat-icon orange">📦</div><div><div class="stat-val orange">${items.reduce((s,x)=>s+x.qty,0)}</div><div class="stat-lbl">Unidades</div></div></div></div>
     </div>
+    ${renderTopProductosSemana(ventasSemana)}
     <div class="card-title">Productos vendidos</div>`;
   items.forEach((p,i)=>{
     html+=`<div class="report-item">
@@ -1750,6 +1824,26 @@ function generarPDF(tipo){
       {label:'Transacciones',val:ventas.length.toString(),color:[26,86,219]},
       {label:'Unidades',val:String(totalUds),color:[217,119,6]},
     ]); y+=26;
+    if(tipo==='dia'){
+      const topSemana=buildItemMap(getVentasSemanaActual()).slice(0,8);
+      if(topSemana.length){
+        const maxQty=Math.max(...topSemana.map(p=>p.qty),1);
+        doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(26,86,219);
+        doc.text('TOP 8 PRODUCTOS DE LA SEMANA',14,y); y+=7;
+        topSemana.forEach((p,i)=>{
+          if(y>H-34){doc.addPage();y=20;}
+          const barW=Math.max(10,Math.round((p.qty/maxQty)*(W-92)));
+          doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(15,23,42);
+          doc.text(`${i+1}. ${p.nombre.substring(0,25)}`,16,y+4.8);
+          doc.setFillColor(240,244,255); doc.roundedRect(70,y,W-98,5,2,2,'F');
+          doc.setFillColor(26,86,219); doc.roundedRect(70,y,barW,5,2,2,'F');
+          doc.setFont('helvetica','bold'); doc.setTextColor(5,150,105);
+          doc.text(`${fmtQty(p.qty)} uds`,W-14,y+4.8,{align:'right'});
+          y+=8;
+        });
+        y+=5;
+      }
+    }
     doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor(26,86,219);
     doc.text('DETALLE POR PRODUCTO',14,y); y+=6;
     doc.setFillColor(26,86,219); doc.rect(14,y,W-28,8,'F');
@@ -1864,33 +1958,99 @@ function exportarJSON(){
   toast('⬇️ Respaldo exportado correctamente',3000);
 }
 
+function generarIdDisponibleInventario(idBase, usados){
+  const limpio=String(idBase||'').trim()||'P001';
+  let candidato=limpio;
+  const match=limpio.match(/^(.*?)(\d+)$/);
+  let n=match?parseInt(match[2],10):1;
+  const prefijo=match?match[1]:limpio+'-';
+  const ancho=match?match[2].length:1;
+  while(usados.has(normalizarTexto(candidato))){
+    n++;
+    candidato=prefijo+String(n).padStart(ancho,'0');
+  }
+  usados.add(normalizarTexto(candidato));
+  return candidato;
+}
+
+function fusionarInventarioImportado(datos){
+  const idUsados=new Set();
+  const resultado={};
+  const idMap={general:{},papeleria:{},verduleria:{}};
+  PRODUCT_CATS.forEach(cat=>{
+    resultado[cat]=getProductos(cat).map(p=>({...p}));
+    resultado[cat].forEach(p=>idUsados.add(normalizarTexto(p.id)));
+  });
+  PRODUCT_CATS.forEach(cat=>{
+    const key=CAT_KEY[cat];
+    (datos[key]||[]).forEach(p=>{
+      const originalId=String(p.id||'').trim();
+      const nuevoId=generarIdDisponibleInventario(originalId,idUsados);
+      idMap[cat][normalizarTexto(originalId)]=nuevoId;
+      resultado[cat].push({...p,id:nuevoId});
+    });
+    resultado[cat].sort((a,b)=>String(a.id).localeCompare(String(b.id),undefined,{numeric:true}));
+    DB.set(key,resultado[cat]);
+  });
+  return idMap;
+}
+
+function fusionarVentasImportadas(ventasImportadas,idMap){
+  const ventasLocales=DB.get('ventas')||[];
+  const idsUsados=new Set(ventasLocales.map(v=>String(v.id)));
+  let nextId=ventasLocales.reduce((max,v)=>Math.max(max,parseInt(v.id,10)||0),0)+1;
+  const nuevas=(ventasImportadas||[]).map(v=>{
+    const venta={...v,items:(v.items||[]).map(i=>{
+      const cat=i.cat||'general';
+      const mapped=idMap[cat]?.[normalizarTexto(i.id)];
+      return mapped?{...i,id:mapped}:{...i};
+    })};
+    if(venta.id==null||idsUsados.has(String(venta.id))){
+      while(idsUsados.has(String(nextId))) nextId++;
+      venta.id=nextId++;
+    }
+    idsUsados.add(String(venta.id));
+    return venta;
+  });
+  DB.set('ventas',ventasLocales.concat(nuevas));
+  return nuevas.length;
+}
+
+function fusionarUsuariosImportados(usuariosImportados){
+  if(!usuariosImportados) return;
+  const usuarios=DB.get('users')||[];
+  const usados=new Set(usuarios.map(u=>normalizarTexto(u.user)));
+  usuariosImportados.forEach(u=>{
+    if(u&&u.user&&!usados.has(normalizarTexto(u.user))){
+      usuarios.push(u);
+      usados.add(normalizarTexto(u.user));
+    }
+  });
+  DB.set('users',usuarios);
+}
+
 function importarJSON(event){
   const file=event.target.files[0]; if(!file) return;
   const reader=new FileReader();
   reader.onload=function(e){
     try{
       const datos=JSON.parse(e.target.result);
-      if(!datos.productos&&!datos.ventas){toast('⚠️ Archivo no válido');return;}
-      confirmar('⬆️ Restaurar respaldo',`Reemplazará TODOS los datos con "${file.name}". ¿Continuar?`,()=>{
-        if(datos.negocio) DB.set('negocio',datos.negocio);
-        if(datos.usuarios) DB.set('users',datos.usuarios);
-        if(datos.productos) DB.set('productos',datos.productos);
-        if(datos.papeleria) DB.set('papeleria',datos.papeleria);
-        if(datos.verduleria) DB.set('verduleria',datos.verduleria);
-        if(datos.ventas) DB.set('ventas',datos.ventas);
-        if(datos.colores) DB.set('colors',datos.colores);
-        if(datos.caja!=null) DB.set('caja',datos.caja);
-        toast('✅ Datos restaurados',3000);
+      if(!datos.productos&&!datos.papeleria&&!datos.verduleria&&!datos.ventas){toast('Archivo no valido');return;}
+      confirmar('Importar respaldo',`Se conservaran los datos del dispositivo y se agregara lo del archivo "${file.name}". Si hay IDs repetidos, se autoincrementaran. Continuar?`,()=>{
+        const idMap=fusionarInventarioImportado(datos);
+        const ventasAgregadas=fusionarVentasImportadas(datos.ventas,idMap);
+        fusionarUsuariosImportados(datos.usuarios);
+        if(datos.caja!=null) DB.set('caja',getCaja()+Number(datos.caja||0));
+        toast(`Datos importados: ${ventasAgregadas} ventas agregadas`,3500);
         loadColors(); actualizarNombreNegocio(); refreshInicio();
         renderInventario('general');renderInventario('papeleria');renderInventario('verduleria');
         loadAjustes();
       });
-    } catch(err){ toast('❌ Error al leer el archivo JSON'); }
+    } catch(err){ toast('Error al leer el archivo JSON'); }
   };
   reader.readAsText(file);
   event.target.value='';
 }
-
 // ===== AJUSTES =====
 function loadAjustes(){
   document.getElementById('cfg-user').value=currentUser||'';
